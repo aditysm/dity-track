@@ -89,15 +89,16 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Fetch orders from our server-side API
+  // Fetch orders from our server-side API with direct client-side fallback
   const fetchOrders = async (silent = false) => {
     if (!silent) setIsLoading(true);
     else setIsRefreshing(true);
 
     try {
+      // 1. Try fetching from server API first
       const response = await fetch('/api/orders');
       if (!response.ok) {
-        throw new Error(`Gagal memuat data dari server: ${response.status}`);
+        throw new Error(`Server API status ${response.status}`);
       }
       
       const data = await response.json();
@@ -121,18 +122,167 @@ export default function App() {
         setIsUnauthorized(!!data.isUnauthorized);
         setSpreadsheetId(data.spreadsheetId || '');
 
-        // Capture last sync hours and minutes
         const now = new Date();
-        const HH = String(now.getHours()).padStart(2, '0');
-        const MM = String(now.getMinutes()).padStart(2, '0');
-        setLastSyncTime(`${HH}:${MM}`);
+        setLastSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
         setShowSyncToast(true);
+        return;
       } else {
-        throw new Error('Format data respons tidak valid');
+        throw new Error('Format data respons server tidak valid');
       }
     } catch (err) {
-      console.error('[App] Error fetching orders:', err);
-      setIsFallback(true);
+      console.warn('[App] Server-side API fetch failed, trying direct client-side Google Sheets fetch...', err);
+      
+      // 2. Direct client-side Google Sheets Visualization API fetch
+      const SPREADSHEET_ID = "1jdwDEOGPDTWyj2buJTUfv-pm0FoBlkcIQ5ofWgHasyU";
+      const SHEET_NAME = "Pesanan";
+      const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+      
+      try {
+        const emailToNameMap: Record<string, string> = {
+          "adityptra212@gmail.com": "Aditya Putra",
+          "budi.santoso@yahoo.com": "Budi Santoso",
+          "clarissa.putri@gmail.com": "Clarissa Putri",
+          "dian.pratama@outlook.com": "Dian Pratama",
+          "eko.wijaya@gmail.com": "Eko Wijaya"
+        };
+        
+        try {
+          const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}`;
+          const resp = await fetch(responsesUrl);
+          if (resp.ok) {
+            const respText = await resp.text();
+            const respMatch = respText.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+            if (respMatch) {
+              const respJson = JSON.parse(respMatch[1]);
+              if (respJson.status !== "error" && respJson.table && respJson.table.cols && respJson.table.rows) {
+                const respCols = respJson.table.cols.map((c: any) => (c.label || c.id || "").trim());
+                let emailColIdx = -1;
+                let nameColIdx = -1;
+                respCols.forEach((col: string, idx: number) => {
+                  const colLower = col.toLowerCase();
+                  if (colLower.includes("email") || colLower.includes("username") || colLower === "client_id") {
+                    if (emailColIdx === -1 || colLower === "email address" || colLower === "alamat email") emailColIdx = idx;
+                  }
+                  if (colLower.includes("nama") || colLower.includes("name")) {
+                    if (nameColIdx === -1 || colLower === "nama" || colLower === "nama lengkap" || colLower === "nama pemesan") nameColIdx = idx;
+                  }
+                });
+                
+                if (emailColIdx !== -1 && nameColIdx !== -1) {
+                  respJson.table.rows.forEach((r: any) => {
+                    if (r && r.c) {
+                      const emailCell = r.c[emailColIdx];
+                      const nameCell = r.c[nameColIdx];
+                      if (emailCell && emailCell.v !== null && emailCell.v !== undefined &&
+                          nameCell && nameCell.v !== null && nameCell.v !== undefined) {
+                        const emailVal = String(emailCell.v).trim().toLowerCase();
+                        const nameVal = String(nameCell.v).trim();
+                        if (emailVal && nameVal) {
+                          emailToNameMap[emailVal] = nameVal;
+                        }
+                      }
+                    }
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[App] Direct client name mapping fetch failed:', e);
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Google Sheets direct fetch returned status ${response.status}`);
+        }
+        
+        const text = await response.text();
+        const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+        if (!match) {
+          throw new Error("Format visualisasi Google Sheets tidak valid");
+        }
+        
+        const data = JSON.parse(match[1]);
+        if (data.status === "error") {
+          throw new Error(data.errors?.[0]?.detailed_message || "Error dari Google Sheets API");
+        }
+        
+        const cols = data.table.cols.map((c: any) => c.label || c.id || "");
+        const rows = data.table.rows.map((r: any) => {
+          const rowObj: any = {};
+          r.c.forEach((cell: any, i: number) => {
+            const colName = cols[i];
+            if (colName) {
+              rowObj[colName] = cell && cell.v !== null && cell.v !== undefined ? String(cell.v) : "";
+            }
+          });
+          return rowObj;
+        });
+        
+        const parsedOrders: Order[] = rows.map((r: any) => {
+          const clientId = r.CLIENT_ID || "";
+          const emailLower = clientId.trim().toLowerCase();
+          const clientName = emailToNameMap[emailLower] || "";
+          return {
+            id: r.ORDER_ID || "",
+            clientId: clientId,
+            clientName: clientName,
+            contact: r.CONTACT || "",
+            status: (r.STATUS || "DIPROSES") as Order['status'],
+            totalPrice: r.TOTAL_PRICE || "0",
+            createdAt: r.CREATED_AT || "",
+            finishedAt: r.FINISHED_AT || "-",
+            orderData: r.ORDER_DATA || "",
+            gformRow: r.GFORM_ROW || "0",
+            parsedData: parseOrderData(r.ORDER_DATA || "")
+          };
+        }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
+        
+        setOrders(parsedOrders);
+        setIsFallback(false);
+        setIsUnauthorized(false);
+        setSpreadsheetId(SPREADSHEET_ID);
+
+        const now = new Date();
+        setLastSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+        setShowSyncToast(true);
+      } catch (directErr: any) {
+        console.error('[App] Direct client-side Google Sheets fetch also failed. Using local mock data:', directErr);
+        
+        // Final fallback to mock data
+        const MOCK_ORDERS = [
+          {
+            id: "INV-20260720-01",
+            clientId: "adityptra212@gmail.com",
+            clientName: "Aditya Putra",
+            contact: "628512345678",
+            status: "DIPROSES" as Order['status'],
+            totalPrice: "75000",
+            createdAt: "2026-07-20 08:30:00",
+            finishedAt: "-",
+            orderData: "Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra",
+            gformRow: "2",
+            parsedData: parseOrderData("Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra")
+          },
+          {
+            id: "INV-20260719-02",
+            clientId: "budi.santoso@yahoo.com",
+            clientName: "Budi Santoso",
+            contact: "628123456789",
+            status: "DIKERJAKAN" as Order['status'],
+            totalPrice: "120000",
+            createdAt: "2026-07-19 14:15:00",
+            finishedAt: "-",
+            orderData: "Kampus: Universitas Indonesia | Fakultas: Ilmu Komputer | Prodi: Teknik Informatika | SMA: SMAN 8 Jakarta | Jalur: SNBT | Jenis Univ: Combo | Jenis Fak: Combo | IG: @budisantoso",
+            gformRow: "3",
+            parsedData: parseOrderData("Kampus: Universitas Indonesia | Fakultas: Ilmu Komputer | Prodi: Teknik Informatika | SMA: SMAN 8 Jakarta | Jalur: SNBT | Jenis Univ: Combo | Jenis Fak: Combo | IG: @budisantoso")
+          }
+        ];
+        
+        setOrders(MOCK_ORDERS);
+        setIsFallback(true);
+        setSpreadsheetId(SPREADSHEET_ID);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
