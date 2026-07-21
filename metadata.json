@@ -1,0 +1,6 @@
+{
+  "name": "Dity Store Tracking",
+  "description": "Website pencarian dan pelacakan status pesanan ID Card Dity Store secara real-time melalui integrasi Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
