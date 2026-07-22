@@ -81,6 +81,13 @@ app.get("/api/orders", async (req, res) => {
     "dian.pratama@outlook.com": "Dian Pratama",
     "eko.wijaya@gmail.com": "Eko Wijaya"
   };
+  let rowToNameMap: Record<string, string> = {
+    "2": "Aditya Putra",
+    "3": "Budi Santoso",
+    "4": "Clarissa Putri",
+    "5": "Dian Pratama",
+    "6": "Eko Wijaya"
+  };
 
   try {
     const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}`;
@@ -111,7 +118,7 @@ app.get("/api/orders", async (req, res) => {
           });
 
           if (emailColIdx !== -1 && nameColIdx !== -1 && respJson.table.rows) {
-            respJson.table.rows.forEach((r: any) => {
+            respJson.table.rows.forEach((r: any, idx: number) => {
               if (r && r.c) {
                 const emailCell = r.c[emailColIdx];
                 const nameCell = r.c[nameColIdx];
@@ -121,6 +128,14 @@ app.get("/api/orders", async (req, res) => {
                   const nameVal = String(nameCell.v).trim();
                   if (emailVal && nameVal) {
                     emailToNameMap[emailVal] = nameVal;
+                  }
+                }
+
+                if (nameCell && nameCell.v !== null && nameCell.v !== undefined) {
+                  const nameVal = String(nameCell.v).trim();
+                  if (nameVal) {
+                    const sheetRowStr = String(idx + 2);
+                    rowToNameMap[sheetRowStr] = nameVal;
                   }
                 }
               }
@@ -173,7 +188,8 @@ app.get("/api/orders", async (req, res) => {
     const formattedOrders = rows.map((r: any) => {
       const clientId = r.CLIENT_ID || "";
       const emailLower = clientId.trim().toLowerCase();
-      const clientName = emailToNameMap[emailLower] || "";
+      const gformRow = String(r.GFORM_ROW || "").trim();
+      const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
       return {
         ORDER_ID: r.ORDER_ID || "",
         CLIENT_ID: clientId,
@@ -184,7 +200,7 @@ app.get("/api/orders", async (req, res) => {
         CREATED_AT: r.CREATED_AT || "",
         FINISHED_AT: r.FINISHED_AT || "-",
         ORDER_DATA: r.ORDER_DATA || "",
-        GFORM_ROW: r.GFORM_ROW || "0"
+        GFORM_ROW: gformRow
       };
     }).filter((order: any) => order.ORDER_ID !== "" && order.ORDER_ID !== "ORDER_ID"); // Filter headers or empty items
 
@@ -200,10 +216,14 @@ app.get("/api/orders", async (req, res) => {
     const isUnauthorized = !!(error.message && (error.message.includes("401") || error.message.includes("403") || error.message.includes("unauthorized") || error.message.includes("Unauthorized")));
     
     // Fallback data mapping with fallback names
-    const fallbackOrdersWithNames = MOCK_ORDERS.map(o => ({
-      ...o,
-      CLIENT_NAME: emailToNameMap[o.CLIENT_ID.toLowerCase()] || ""
-    }));
+    const fallbackOrdersWithNames = MOCK_ORDERS.map(o => {
+      const gformRow = String(o.GFORM_ROW || "").trim();
+      const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[o.CLIENT_ID.toLowerCase()] || "";
+      return {
+        ...o,
+        CLIENT_NAME: clientName
+      };
+    });
 
     return res.json({
       success: true,

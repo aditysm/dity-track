@@ -145,6 +145,13 @@ export default function App() {
           "dian.pratama@outlook.com": "Dian Pratama",
           "eko.wijaya@gmail.com": "Eko Wijaya"
         };
+        const rowToNameMap: Record<string, string> = {
+          "2": "Aditya Putra",
+          "3": "Budi Santoso",
+          "4": "Clarissa Putri",
+          "5": "Dian Pratama",
+          "6": "Eko Wijaya"
+        };
         
         try {
           const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}`;
@@ -169,7 +176,7 @@ export default function App() {
                 });
                 
                 if (emailColIdx !== -1 && nameColIdx !== -1) {
-                  respJson.table.rows.forEach((r: any) => {
+                  respJson.table.rows.forEach((r: any, idx: number) => {
                     if (r && r.c) {
                       const emailCell = r.c[emailColIdx];
                       const nameCell = r.c[nameColIdx];
@@ -179,6 +186,14 @@ export default function App() {
                         const nameVal = String(nameCell.v).trim();
                         if (emailVal && nameVal) {
                           emailToNameMap[emailVal] = nameVal;
+                        }
+                      }
+
+                      if (nameCell && nameCell.v !== null && nameCell.v !== undefined) {
+                        const nameVal = String(nameCell.v).trim();
+                        if (nameVal) {
+                          const sheetRowStr = String(idx + 2);
+                          rowToNameMap[sheetRowStr] = nameVal;
                         }
                       }
                     }
@@ -222,7 +237,8 @@ export default function App() {
         const parsedOrders: Order[] = rows.map((r: any) => {
           const clientId = r.CLIENT_ID || "";
           const emailLower = clientId.trim().toLowerCase();
-          const clientName = emailToNameMap[emailLower] || "";
+          const gformRow = String(r.GFORM_ROW || "").trim();
+          const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
           return {
             id: r.ORDER_ID || "",
             clientId: clientId,
@@ -233,7 +249,7 @@ export default function App() {
             createdAt: r.CREATED_AT || "",
             finishedAt: r.FINISHED_AT || "-",
             orderData: r.ORDER_DATA || "",
-            gformRow: r.GFORM_ROW || "0",
+            gformRow: gformRow,
             parsedData: parseOrderData(r.ORDER_DATA || "")
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");

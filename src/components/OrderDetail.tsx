@@ -108,12 +108,12 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
             </button>
           </div>
           <h2 className="text-xl md:text-2xl font-display font-bold text-slate-800">
-            Pencarian Pesanan: {order.clientName || getEmailDisplayName(order.clientId)}
+            {order.clientName || getEmailDisplayName(order.clientId)}
           </h2>
           <div className="flex items-center gap-4 text-xs text-slate-400 font-sans">
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              Diterima: {formatDateTime(order.createdAt)}
+              Dibuat: {formatDateTime(order.createdAt)}
             </span>
           </div>
         </div>
