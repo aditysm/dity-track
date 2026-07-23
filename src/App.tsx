@@ -477,6 +477,11 @@ export default function App() {
     return 'LANDING';
   }, [pathname]);
 
+  // Scroll to top instantly on page/view transition
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeView]);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans" id="app-root">
       {/* Floating Sync & Action Toast */}
