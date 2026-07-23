@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -19,7 +20,11 @@ const MOCK_ORDERS = [
     CREATED_AT: "2026-07-20 08:30:00",
     FINISHED_AT: "-",
     ORDER_DATA: "Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra",
-    GFORM_ROW: "2"
+    GFORM_ROW: "2",
+    LINK_QR: "https://drive.google.com/file/d/1t_W-m63tV1_z-XmO5V_zJg-YmX6f_S_Z/view?usp=sharing",
+    LINK_PROJECT: "https://github.com/adityptra212/dity-track",
+    STATUS_QR: "",
+    STATUS_PROJECT: ""
   },
   {
     ORDER_ID: "INV-20260719-02",
@@ -30,7 +35,11 @@ const MOCK_ORDERS = [
     CREATED_AT: "2026-07-19 14:15:00",
     FINISHED_AT: "-",
     ORDER_DATA: "Kampus: Universitas Indonesia | Fakultas: Ilmu Komputer | Prodi: Teknik Informatika | SMA: SMAN 8 Jakarta | Jalur: SNBT | Jenis Univ: Combo | Jenis Fak: Combo | IG: @budisantoso",
-    GFORM_ROW: "3"
+    GFORM_ROW: "3",
+    LINK_QR: "https://drive.google.com/file/d/1t_W-m63tV1_z-XmO5V_zJg-YmX6f_S_Z/view?usp=sharing",
+    LINK_PROJECT: "https://github.com/adityptra212/dity-track",
+    STATUS_QR: "",
+    STATUS_PROJECT: ""
   },
   {
     ORDER_ID: "INV-20260718-03",
@@ -41,7 +50,11 @@ const MOCK_ORDERS = [
     CREATED_AT: "2026-07-18 10:00:00",
     FINISHED_AT: "-",
     ORDER_DATA: "Kampus: Universitas Gadjah Mada | Fakultas: Kedokteran | Prodi: Pendidikan Dokter | SMA: SMA Stella Duce 1 | Jalur: Mandiri | Jenis Univ: Reguler | Jenis Fak: - | IG: @clarissa.ptr",
-    GFORM_ROW: "4"
+    GFORM_ROW: "4",
+    LINK_QR: "",
+    LINK_PROJECT: "",
+    STATUS_QR: "",
+    STATUS_PROJECT: ""
   },
   {
     ORDER_ID: "INV-20260715-04",
@@ -52,7 +65,11 @@ const MOCK_ORDERS = [
     CREATED_AT: "2026-07-15 09:00:00",
     FINISHED_AT: "2026-07-17 15:30:00",
     ORDER_DATA: "Kampus: Institut Teknologi Bandung | Fakultas: STEI | Prodi: Teknik Elektro | SMA: SMAN 3 Bandung | Jalur: SNBP | Jenis Univ: Combo | Jenis Fak: Combo | IG: @dianprtm",
-    GFORM_ROW: "5"
+    GFORM_ROW: "5",
+    LINK_QR: "",
+    LINK_PROJECT: "",
+    STATUS_QR: "",
+    STATUS_PROJECT: ""
   },
   {
     ORDER_ID: "INV-20260710-05",
@@ -63,9 +80,16 @@ const MOCK_ORDERS = [
     CREATED_AT: "2026-07-10 11:20:00",
     FINISHED_AT: "2026-07-10 11:45:00",
     ORDER_DATA: "Kampus: Universitas Sebelas Maret | Fakultas: Hukum | Prodi: Ilmu Hukum | SMA: SMAN 1 Surakarta | Jalur: Mandiri | Jenis Univ: - | Jenis Fak: Premium | IG: @ekowjy",
-    GFORM_ROW: "6"
+    GFORM_ROW: "6",
+    LINK_QR: "",
+    LINK_PROJECT: "",
+    STATUS_QR: "",
+    STATUS_PROJECT: ""
   }
 ];
+
+// Confirmation overrides store
+const confirmations: Record<string, { statusQr?: string; statusProject?: string }> = {};
 
 // Endpoint to fetch order status from Google Sheets SPREADSHEET_ID or fallback
 app.get("/api/orders", async (req, res) => {
@@ -185,13 +209,33 @@ app.get("/api/orders", async (req, res) => {
     });
 
     // Map rows to ensure keys are exactly matching our schema, integrating real CLIENT_NAME
-    const formattedOrders = rows.map((r: any) => {
+    const formattedOrders = rows.map((r: any, idx: number) => {
+      const orderId = r.ORDER_ID || "";
       const clientId = r.CLIENT_ID || "";
       const emailLower = clientId.trim().toLowerCase();
-      const gformRow = String(r.GFORM_ROW || "").trim();
+      // If GFORM_ROW is not a column, use idx + 2 (since index 0 of rows is spreadsheet row 2)
+      const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
       const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
+      const override = confirmations[orderId] || {};
+      
+      // Resilient column mapping with placeholder cleanup
+      const cleanLink = (val: any) => {
+        if (!val) return "";
+        const s = String(val).trim();
+        if (s === "" || s === "-") return "";
+        if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) {
+          return "";
+        }
+        return s;
+      };
+
+      const linkQr = cleanLink(r.LINK_QR || r._QR || r.QR_LINK);
+      const linkProject = cleanLink(r.LINK_PROJECT || r.LINK_PROJECT1);
+      const statusQr = override.statusQr || r.STATUS_QR || "";
+      const statusProject = override.statusProject || r.STATUS_PROJECT || "";
+
       return {
-        ORDER_ID: r.ORDER_ID || "",
+        ORDER_ID: orderId,
         CLIENT_ID: clientId,
         CLIENT_NAME: clientName,
         CONTACT: r.CONTACT || "",
@@ -200,7 +244,11 @@ app.get("/api/orders", async (req, res) => {
         CREATED_AT: r.CREATED_AT || "",
         FINISHED_AT: r.FINISHED_AT || "-",
         ORDER_DATA: r.ORDER_DATA || "",
-        GFORM_ROW: gformRow
+        GFORM_ROW: gformRow,
+        LINK_QR: linkQr,
+        LINK_PROJECT: linkProject,
+        STATUS_QR: statusQr,
+        STATUS_PROJECT: statusProject
       };
     }).filter((order: any) => order.ORDER_ID !== "" && order.ORDER_ID !== "ORDER_ID"); // Filter headers or empty items
 
@@ -219,9 +267,12 @@ app.get("/api/orders", async (req, res) => {
     const fallbackOrdersWithNames = MOCK_ORDERS.map(o => {
       const gformRow = String(o.GFORM_ROW || "").trim();
       const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[o.CLIENT_ID.toLowerCase()] || "";
+      const override = confirmations[o.ORDER_ID] || {};
       return {
         ...o,
-        CLIENT_NAME: clientName
+        CLIENT_NAME: clientName,
+        STATUS_QR: override.statusQr || o.STATUS_QR || "",
+        STATUS_PROJECT: override.statusProject || o.STATUS_PROJECT || ""
       };
     });
 
@@ -235,6 +286,83 @@ app.get("/api/orders", async (req, res) => {
       orders: fallbackOrdersWithNames
     });
   }
+});
+
+// Endpoint to confirm QR or Client status
+app.post("/api/orders/confirm", async (req, res) => {
+  const { orderId, type, status, row } = req.body;
+  if (!orderId || !type || !status) {
+    return res.status(400).json({ success: false, message: "Informasi konfirmasi tidak lengkap" });
+  }
+
+  // Save to in-memory store as fallback
+  if (!confirmations[orderId]) {
+    confirmations[orderId] = {};
+  }
+
+  if (type === "qr") {
+    confirmations[orderId].statusQr = status;
+  } else if (type === "project") {
+    confirmations[orderId].statusProject = status;
+  }
+
+  // Forward to Google Apps Script Web App if APPS_SCRIPT_URL is configured
+  const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
+  let syncedWithSheets = false;
+  let syncError = null;
+
+  if (APPS_SCRIPT_URL) {
+    try {
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "update_status",
+          row: row || "",
+          type: type
+        })
+      });
+
+      if (response.ok) {
+        const textResponse = await response.text();
+        let result: any = null;
+        try {
+          result = JSON.parse(textResponse);
+        } catch (e) {
+          const trimmed = textResponse.trim().toUpperCase();
+          if (trimmed === "OK" || trimmed === "SUCCESS" || trimmed.includes("SUCCESS")) {
+            result = { success: true };
+          }
+        }
+
+        if (result && result.success) {
+          syncedWithSheets = true;
+          console.log(`[Server] Sync success to Google Sheets for order ${orderId}, row ${row || 'auto'}`);
+        } else {
+          syncError = result ? (result.error || "Google Sheets returned success: false") : `Respon dari Apps Script: "${textResponse}"`;
+          console.warn(`[Server] Google Sheets sync failed: ${syncError}`);
+        }
+      } else {
+        syncError = `HTTP status ${response.status}`;
+        console.warn(`[Server] Google Sheets sync HTTP error: ${syncError}`);
+      }
+    } catch (err: any) {
+      syncError = err.message || "Unknown error";
+      console.warn(`[Server] Failed to connect to APPS_SCRIPT_URL: ${syncError}`);
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: syncedWithSheets 
+      ? `Status ${type.toUpperCase()} berhasil dikonfirmasi dan disimpan langsung ke Google Sheet!`
+      : `Status ${type.toUpperCase()} dikonfirmasi secara lokal (Menunggu konfigurasi APPS_SCRIPT_URL)`,
+    syncedWithSheets,
+    syncError,
+    confirmation: confirmations[orderId]
+  });
 });
 
 // Configure Vite integration or asset serving

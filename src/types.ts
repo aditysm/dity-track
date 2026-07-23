@@ -23,4 +23,8 @@ export interface Order {
   orderData: string;   // ORDER_DATA raw string
   gformRow: string;    // GFORM_ROW index
   parsedData: ParsedOrderData;
+  linkQr?: string;       // LINK_QR
+  linkProject?: string;  // LINK_PROJECT
+  statusQr?: string;     // STATUS_QR
+  statusProject?: string; // STATUS_PROJECT
 }

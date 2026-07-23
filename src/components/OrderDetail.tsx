@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatCurrency, formatDateTime, getEmailDisplayName } from '../utils';
@@ -9,6 +9,7 @@ import { formatCurrency, formatDateTime, getEmailDisplayName } from '../utils';
 interface OrderDetailProps {
   order: Order;
   onBack: () => void;
+  onConfirm: (orderId: string, type: 'qr' | 'project', status: string) => Promise<boolean> | boolean;
 }
 
 // Custom inline WhatsApp SVG icon
@@ -22,13 +23,40 @@ const WhatsAppIcon = () => (
   </svg>
 );
 
-export default function OrderDetail({ order, onBack }: OrderDetailProps) {
+export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailProps) {
   const [copied, setCopied] = useState(false);
+  const [showQrPopup, setShowQrPopup] = useState(false);
+  const [showProjectPopup, setShowProjectPopup] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ active: boolean; type: 'qr' | 'project' } | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  // Helper to parse Google Drive URLs for direct rendering
+  const getGoogleDrivePreviewUrl = (url: string) => {
+    if (!url) return "";
+    const m1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const id = (m1 && m1[1]) || (m2 && m2[1]);
+    if (id) {
+      return `https://docs.google.com/uc?export=view&id=${id}`;
+    }
+    return url;
+  };
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(order.id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleActionConfirm = async () => {
+    if (!confirmDialog) return;
+    const { type } = confirmDialog;
+    const success = await onConfirm(order.id, type, 'DIKONFIRMASI');
+    if (success) {
+      setConfirmDialog(null);
+      setShowQrPopup(false);
+      setShowProjectPopup(false);
+    }
   };
 
   const getStatusStepIndex = (status: Order['status']): number => {
@@ -74,9 +102,13 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
     }
   ];
 
+  const hasIg = order.parsedData.ig && order.parsedData.ig !== '-';
+  const isDikerjakan = order.status === 'DIKERJAKAN';
+  const showStickyBottom = isDikerjakan && hasIg && (order.statusQr !== 'DIKONFIRMASI' || order.statusProject !== 'DIKONFIRMASI');
+
   return (
     <div
-      className="w-full max-w-4xl mx-auto px-4 py-6 space-y-8"
+      className={`w-full max-w-4xl mx-auto px-4 py-6 space-y-8 ${showStickyBottom ? 'pb-28' : ''}`}
       id="detail-container"
     >
       {/* Back to Results */}
@@ -353,6 +385,210 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
           </div>
         </div>
       </div>
+
+      {/* Sticky Bottom Bar */}
+      {showStickyBottom && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-3.5 px-4 md:px-8 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] z-40 flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-up">
+          <div className="flex flex-col text-center sm:text-left">
+            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest font-mono">
+              {order.statusQr !== 'DIKONFIRMASI' ? 'Tahap 1: Verifikasi QR' : 'Tahap 2: Hasil ID Card'}
+            </span>
+            <span className="text-xs text-slate-500 font-sans mt-0.5">
+              {order.statusQr !== 'DIKONFIRMASI' 
+                ? (order.linkQr ? 'Silakan periksa dan konfirmasi QR Instagram Anda di bawah.' : 'Menunggu desainer mengunggah link QR Instagram.') 
+                : (order.linkProject ? 'Project desain selesai! Silakan periksa hasil ID Card Anda.' : 'Menunggu desainer mengunggah link hasil ID Card Anda.')}
+            </span>
+          </div>
+
+          {order.statusQr !== 'DIKONFIRMASI' ? (
+            <button
+              onClick={() => {
+                setImageError(false);
+                setShowQrPopup(true);
+              }}
+              disabled={!order.linkQr}
+              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                order.linkQr 
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/15 cursor-pointer active:scale-95' 
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <Instagram className="w-4 h-4" />
+              <span>Lihat QR Saya</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowProjectPopup(true)}
+              disabled={!order.linkProject}
+              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                order.linkProject 
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/15 cursor-pointer active:scale-95' 
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Lihat ID Card Saya</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* POPUP 1: QR INSTAGRAM */}
+      {showQrPopup && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-6">
+            <button 
+              onClick={() => setShowQrPopup(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-800 font-display">Verifikasi QR Instagram</h3>
+              <p className="text-xs text-slate-400">Silakan periksa QR Instagram untuk akun {order.parsedData.ig} melalui tombol di bawah ini.</p>
+            </div>
+
+            <div className="p-6 bg-blue-50/50 border border-blue-100/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                <Instagram className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 max-w-xs">
+                <p className="font-bold text-sm text-slate-800">Tautan QR Instagram</p>
+                <p className="text-xs text-slate-400 font-sans">Kode QR Instagram dapat diakses langsung secara online.</p>
+              </div>
+              {order.linkQr ? (
+                <a
+                  href={order.linkQr}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/15 active:scale-95 cursor-pointer"
+                >
+                  <span>Buka QR Instagram Saya</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              ) : (
+                <p className="text-xs text-amber-600 font-bold">Tautan QR belum siap.</p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDialog({ active: true, type: 'qr' })}
+                className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+              >
+                <CheckCircle2 className="w-4.5 h-4.5" />
+                <span>QR Sudah Benar</span>
+              </button>
+              
+              <a
+                href={`https://wa.me/62895634048237?text=${encodeURIComponent(`Halo Admin, saya ingin melaporkan bahwa QR pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*) salah. Mohon bantuannya.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-3 px-4 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md shadow-rose-500/10 transition-all flex items-center justify-center gap-1.5 text-center"
+              >
+                <AlertTriangle className="w-4.5 h-4.5" />
+                <span>Laporkan QR Salah</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 2: PROJECT ID CARD */}
+      {showProjectPopup && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-6">
+            <button 
+              onClick={() => setShowProjectPopup(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-800 font-display">Hasil ID Card Anda</h3>
+              <p className="text-xs text-slate-400">Projek ID Card Anda sudah selesai dibuat. Silakan periksa melalui tombol di bawah ini.</p>
+            </div>
+
+            <div className="p-6 bg-blue-50/50 border border-blue-100/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                <ExternalLink className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 max-w-xs">
+                <p className="font-bold text-sm text-slate-800">Tautan Desain Projek</p>
+                <p className="text-xs text-slate-400">Desain lengkap ID Card dapat diakses langsung secara online.</p>
+              </div>
+              {order.linkProject ? (
+                <a
+                  href={order.linkProject}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/15 active:scale-95 cursor-pointer"
+                >
+                  <span>Buka Desain Saya</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              ) : (
+                <p className="text-xs text-amber-600 font-bold">Link desain belum siap.</p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDialog({ active: true, type: 'project' })}
+                className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+              >
+                <CheckCircle2 className="w-4.5 h-4.5" />
+                <span>Desain Sudah Benar</span>
+              </button>
+              
+              <a
+                href={`https://wa.me/62895634048237?text=${encodeURIComponent(`Halo Admin, saya ingin melaporkan bahwa Project ID Card pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*) salah. Mohon bantuannya.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-3 px-4 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md shadow-rose-500/10 transition-all flex items-center justify-center gap-1.5 text-center"
+              >
+                <AlertTriangle className="w-4.5 h-4.5" />
+                <span>Laporkan ID Card Salah</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 3: OVERALL CONFIRMATION BOX */}
+      {confirmDialog?.active && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full border border-slate-100 p-6 shadow-2xl text-center space-y-4 animate-scale-up">
+            <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="font-bold text-slate-800 text-base font-display">Konfirmasi Persetujuan</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Apakah Anda yakin data ini sudah benar? Setelah dikonfirmasi, data tidak dapat diubah kembali.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleActionConfirm}
+                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all cursor-pointer"
+              >
+                Ya, Benar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

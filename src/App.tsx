@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { RefreshCw, Database, Sparkles, HelpCircle, X, Contact } from 'lucide-react';
+import { RefreshCw, Database, Sparkles, HelpCircle, X, Contact, Copy, Check, Code, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Order } from './types';
 import { parseOrderData } from './utils';
@@ -18,9 +18,23 @@ export default function App() {
   const [spreadsheetId, setSpreadsheetId] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showConfigHelp, setShowConfigHelp] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
-  const [showSyncToast, setShowSyncToast] = useState(false);
+  const [toast, setToast] = useState<{
+    type: 'success' | 'warning' | 'error';
+    message: string;
+  } | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  // Auto-dismiss toast after 5 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Load recent searches from localStorage on mount
   useEffect(() => {
@@ -52,16 +66,6 @@ export default function App() {
       return updated;
     });
   };
-
-  // Auto-dismiss sync toast after 4 seconds
-  useEffect(() => {
-    if (showSyncToast) {
-      const timer = setTimeout(() => {
-        setShowSyncToast(false);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSyncToast]);
 
   // Custom client-side router function
   const navigate = (path: string, params?: Record<string, string>) => {
@@ -114,7 +118,11 @@ export default function App() {
           finishedAt: o.FINISHED_AT,
           orderData: o.ORDER_DATA,
           gformRow: o.GFORM_ROW,
-          parsedData: parseOrderData(o.ORDER_DATA)
+          parsedData: parseOrderData(o.ORDER_DATA),
+          linkQr: o.LINK_QR || '',
+          linkProject: o.LINK_PROJECT || '',
+          statusQr: o.STATUS_QR || '',
+          statusProject: o.STATUS_PROJECT || ''
         }));
         
         setOrders(parsedOrders);
@@ -123,8 +131,14 @@ export default function App() {
         setSpreadsheetId(data.spreadsheetId || '');
 
         const now = new Date();
-        setLastSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
-        setShowSyncToast(true);
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        setLastSyncTime(timeStr);
+        if (!silent) {
+          setToast({
+            type: 'success',
+            message: 'Sinkronisasi berhasil!'
+          });
+        }
         return;
       } else {
         throw new Error('Format data respons server tidak valid');
@@ -250,7 +264,23 @@ export default function App() {
             finishedAt: r.FINISHED_AT || "-",
             orderData: r.ORDER_DATA || "",
             gformRow: gformRow,
-            parsedData: parseOrderData(r.ORDER_DATA || "")
+            parsedData: parseOrderData(r.ORDER_DATA || ""),
+            linkQr: (() => {
+              const val = r.LINK_QR || r._QR || r.QR_LINK || "";
+              const s = String(val).trim();
+              if (s === "" || s === "-") return "";
+              if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
+              return s;
+            })(),
+            linkProject: (() => {
+              const val = r.LINK_PROJECT || r.LINK_PROJECT1 || "";
+              const s = String(val).trim();
+              if (s === "" || s === "-") return "";
+              if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
+              return s;
+            })(),
+            statusQr: r.STATUS_QR || "",
+            statusProject: r.STATUS_PROJECT || ""
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         
@@ -260,8 +290,14 @@ export default function App() {
         setSpreadsheetId(SPREADSHEET_ID);
 
         const now = new Date();
-        setLastSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
-        setShowSyncToast(true);
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        setLastSyncTime(timeStr);
+        if (!silent) {
+          setToast({
+            type: 'success',
+            message: 'Sinkronisasi berhasil!'
+          });
+        }
       } catch (directErr: any) {
         console.error('[App] Direct client-side Google Sheets fetch also failed. Using local mock data:', directErr);
         
@@ -278,7 +314,11 @@ export default function App() {
             finishedAt: "-",
             orderData: "Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra",
             gformRow: "2",
-            parsedData: parseOrderData("Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra")
+            parsedData: parseOrderData("Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra"),
+            linkQr: "https://drive.google.com/file/d/1t_W-m63tV1_z-XmO5V_zJg-YmX6f_S_Z/view?usp=sharing",
+            linkProject: "https://github.com/adityptra212/dity-track",
+            statusQr: "",
+            statusProject: ""
           },
           {
             id: "INV-20260719-02",
@@ -291,13 +331,23 @@ export default function App() {
             finishedAt: "-",
             orderData: "Kampus: Universitas Indonesia | Fakultas: Ilmu Komputer | Prodi: Teknik Informatika | SMA: SMAN 8 Jakarta | Jalur: SNBT | Jenis Univ: Combo | Jenis Fak: Combo | IG: @budisantoso",
             gformRow: "3",
-            parsedData: parseOrderData("Kampus: Universitas Indonesia | Fakultas: Ilmu Komputer | Prodi: Teknik Informatika | SMA: SMAN 8 Jakarta | Jalur: SNBT | Jenis Univ: Combo | Jenis Fak: Combo | IG: @budisantoso")
+            parsedData: parseOrderData("Kampus: Universitas Indonesia | Fakultas: Ilmu Komputer | Prodi: Teknik Informatika | SMA: SMAN 8 Jakarta | Jalur: SNBT | Jenis Univ: Combo | Jenis Fak: Combo | IG: @budisantoso"),
+            linkQr: "https://drive.google.com/file/d/1t_W-m63tV1_z-XmO5V_zJg-YmX6f_S_Z/view?usp=sharing",
+            linkProject: "https://github.com/adityptra212/dity-track",
+            statusQr: "",
+            statusProject: ""
           }
         ];
         
         setOrders(MOCK_ORDERS);
         setIsFallback(true);
         setSpreadsheetId(SPREADSHEET_ID);
+        if (!silent) {
+          setToast({
+            type: 'warning',
+            message: 'Gagal sinkronisasi. Menggunakan data lokal.'
+          });
+        }
       }
     } finally {
       setIsLoading(false);
@@ -366,6 +416,56 @@ export default function App() {
     }
   };
 
+  const handleConfirm = async (orderId: string, type: 'qr' | 'project', status: string) => {
+    const matchingOrder = orders.find(o => o.id === orderId);
+    const row = matchingOrder ? matchingOrder.gformRow : "";
+    try {
+      const response = await fetch('/api/orders/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ orderId, type, status, row })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        await fetchOrders(true); // refresh silently
+        
+        if (result.syncedWithSheets) {
+          setToast({
+            type: 'success',
+            message: type === 'qr' ? 'QR berhasil dikonfirmasi!' : 'Project berhasil disesuaikan!'
+          });
+        } else {
+          setToast({
+            type: 'warning',
+            message: type === 'qr' ? 'QR berhasil dikonfirmasi secara lokal!' : 'Project berhasil disesuaikan secara lokal!'
+          });
+        }
+        return true;
+      }
+    } catch (err: any) {
+      console.error('Gagal mengirim konfirmasi ke server:', err);
+      setToast({
+        type: 'error',
+        message: `Gagal Menghubungkan ke Server: ${err.message || 'Masalah Jaringan'}`
+      });
+    }
+    
+    // Fallback locally
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        return {
+          ...o,
+          statusQr: type === 'qr' ? status : o.statusQr,
+          statusProject: type === 'project' ? status : o.statusProject
+        };
+      }
+      return o;
+    }));
+    return true;
+  };
+
   const handleSelectSample = (id: string) => {
     handleSearch(id);
   };
@@ -379,15 +479,46 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans" id="app-root">
-      {/* Floating Sync Success Toast */}
-      <div 
-        className={`fixed top-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-lg shadow-emerald-900/5 transition-all duration-300 ${
-          showSyncToast ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-4 scale-95 pointer-events-none'
-        }`}
-        id="sync-toast"
-      >
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-        <span>Berhasil sinkronisasi data terbaru pada {lastSyncTime}</span>
+      {/* Floating Sync & Action Toast */}
+      <div className="fixed top-24 left-0 right-0 z-50 flex justify-center pointer-events-none px-4" id="toast-container">
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className={`pointer-events-auto flex items-center gap-2.5 px-4.5 py-2.5 rounded-full border shadow-lg transition-all duration-300 max-w-[92vw] whitespace-nowrap ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-500/5'
+                  : toast.type === 'error'
+                    ? 'bg-rose-50 border-rose-200 text-rose-800 shadow-rose-500/5'
+                    : 'bg-amber-50 border-amber-200 text-amber-800 shadow-amber-500/5'
+              }`}
+              id="app-toast"
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              ) : toast.type === 'error' ? (
+                <AlertTriangle className="w-4 h-4 text-rose-500 flex-shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              )}
+              <span className="text-xs font-bold font-sans">{toast.message}</span>
+              <button 
+                onClick={() => setToast(null)} 
+                className={`text-slate-400 hover:text-slate-600 p-0.5 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                  toast.type === 'success' 
+                    ? 'hover:bg-emerald-100/50' 
+                    : toast.type === 'error' 
+                      ? 'hover:bg-rose-100/50' 
+                      : 'hover:bg-amber-100/50'
+                }`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Top Banner Navigation Bar */}
@@ -411,7 +542,7 @@ export default function App() {
         {/* Database control indicators */}
         <div className="flex items-center gap-3" id="header-controls">
           <button
-            onClick={() => fetchOrders(true)}
+            onClick={() => fetchOrders(false)}
             disabled={isLoading || isRefreshing}
             className="px-4 py-2 rounded-full bg-blue-50 text-blue-600 font-bold border border-blue-100/60 hover:bg-blue-100 disabled:opacity-50 transition-all flex items-center gap-1.5 text-xs cursor-pointer"
             title="Segarkan Data"
@@ -480,6 +611,7 @@ export default function App() {
                   <OrderDetail 
                     order={selectedOrder} 
                     onBack={handleBackToResults}
+                    onConfirm={handleConfirm}
                   />
                 ) : (
                   <div className="text-center py-20 space-y-4" id="order-not-found-fallback">
@@ -505,33 +637,33 @@ export default function App() {
 
       {/* Integration Setup Modal */}
       {showConfigHelp && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-100 p-6 md:p-8 shadow-xl space-y-6 relative" id="help-modal">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full border border-slate-100 p-6 md:p-8 shadow-xl relative flex flex-col max-h-[90vh]" id="help-modal">
             <button 
               onClick={() => setShowConfigHelp(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all"
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all z-10"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-shrink-0">
               <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
                 <Database className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-800 font-display">Panduan Integrasi Google Sheets</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Dity Store Tracking dirancang khusus agar otomatis melacak data dari tab sheet bernama &ldquo;<b>Pesanan</b>&rdquo; yang dibuat secara mandiri oleh skrip Google Apps Script Anda.
+                Dity Store Tracking dirancang khusus agar otomatis melacak dan memperbarui data dari tab sheet bernama &ldquo;<b>Pesanan</b>&rdquo; secara real-time.
               </p>
             </div>
 
-            <div className="space-y-4 text-xs text-slate-600 border-t border-slate-100 pt-4" id="help-steps">
+            <div className="flex-1 overflow-y-auto pr-1 my-4 space-y-5 text-xs text-slate-600 border-t border-b border-slate-100 py-4" id="help-steps">
               <div className="flex gap-3">
                 <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 font-bold flex items-center justify-center flex-shrink-0 text-[10px]">
                   1
                 </div>
                 <div className="space-y-0.5">
                   <p className="font-bold text-slate-700">Publikasikan Akses Google Sheet</p>
-                  <p className="text-slate-400">Buka file Google Sheets Anda, klik tombol <b>Bagikan (Share)</b>, ubah akses umum menjadi <b>&ldquo;Siapa saja yang memiliki link dapat melihat&rdquo;</b> (Anyone with the link can view).</p>
+                  <p className="text-slate-400 font-sans">Buka file Google Sheets Anda, klik tombol <b>Bagikan (Share)</b>, ubah akses umum menjadi <b>&ldquo;Siapa saja yang memiliki link dapat melihat&rdquo;</b> (Anyone with the link can view).</p>
                 </div>
               </div>
 
@@ -541,7 +673,7 @@ export default function App() {
                 </div>
                 <div className="space-y-0.5">
                   <p className="font-bold text-slate-700">Ubah ID Spreadsheet di Workspace</p>
-                  <p className="text-slate-400">Pastikan variabel <code>SPREADSHEET_ID</code> pada panel setelan admin atau file <code>.env</code> Anda sudah diatur menggunakan ID sheet utama Anda.</p>
+                  <p className="text-slate-400 font-sans">Pastikan variabel <code>SPREADSHEET_ID</code> pada panel setelan admin atau file <code>.env</code> Anda sudah diatur menggunakan ID sheet utama Anda.</p>
                 </div>
               </div>
 
@@ -551,15 +683,218 @@ export default function App() {
                 </div>
                 <div className="space-y-0.5">
                   <p className="font-bold text-slate-700">Gunakan Apps Script V3</p>
-                  <p className="text-slate-400">Pastikan kode Apps Script pada Google Form Anda adalah versi mutakhir yang secara otomatis melacak dan merekam baris ke dalam tab sheet khusus &ldquo;Pesanan&rdquo;.</p>
+                  <p className="text-slate-400 font-sans">Pastikan kode Apps Script pada Google Form Anda adalah versi mutakhir yang secara otomatis melacak dan merekam baris ke dalam tab sheet khusus &ldquo;Pesanan&rdquo;.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t border-slate-50 pt-4">
+                <div className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center flex-shrink-0 text-[10px]">
+                  4
+                </div>
+                <div className="space-y-2 w-full">
+                  <p className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>Aktifkan Sinkronisasi Konfirmasi (Tulis Balik)</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold font-mono uppercase tracking-wider">Opsional</span>
+                  </p>
+                  <p className="text-slate-400 font-sans">
+                    Agar tombol konfirmasi (<b>QR Sudah Benar</b> / <b>Hasil Selesai</b>) di website dapat langsung mengubah isi Google Sheets, tambahkan kode Apps Script berikut ke dalam proyek skrip Anda:
+                  </p>
+
+                  <div className="relative mt-2 border border-slate-100 rounded-xl overflow-hidden bg-slate-900/5 text-slate-700 p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                        <Code className="w-3.5 h-3.5" />
+                        <span>Google Apps Script</span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          const code = `function doPost(e) {
+  try {
+    var params = JSON.parse(e.postData.contents);
+    var spreadsheetId = params.spreadsheetId;
+    var sheet;
+    
+    // Sangat Fleksibel: Dukung container-bound script maupun standalone script
+    if (spreadsheetId) {
+      try {
+        sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName("Pesanan");
+      } catch (errOpen) {
+        sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pesanan");
+      }
+    } else {
+      sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pesanan");
+    }
+    
+    if (!sheet) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Tab Sheet 'Pesanan' tidak ditemukan" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var orderId = params.orderId;
+    var row = parseInt(params.row);
+    var type = params.type; // "qr" atau "project"
+    var status = params.status; // "DIKONFIRMASI"
+    
+    // Cari baris jika tidak ada parameter row atau tidak valid
+    if (isNaN(row) || row < 2) {
+      var lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+        for (var i = 0; i < data.length; i++) {
+          if (String(data[i][0]).trim() === String(orderId).trim()) {
+            row = i + 2;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (isNaN(row) || row < 2) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Invoice ID '" + orderId + "' tidak ditemukan di Sheet" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Ambil headers (baris 1) untuk deteksi kolom
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colName = type === "qr" ? "STATUS_QR" : "STATUS_PROJECT";
+    var colIndex = -1;
+    
+    // Pencarian kolom yang tahan spasi & case-insensitive
+    for (var j = 0; j < headers.length; j++) {
+      var headerStr = String(headers[j]).trim().toUpperCase();
+      if (headerStr === colName) {
+        colIndex = j + 1;
+        break;
+      }
+    }
+    
+    // Fallback absolut jika kolom tidak terdeteksi dari nama
+    if (colIndex === -1) {
+      if (type === "qr") {
+        colIndex = 12; // Kolom L (STATUS_QR)
+      } else {
+        colIndex = 14; // Kolom N (STATUS_PROJECT)
+      }
+    }
+    
+    sheet.getRange(row, colIndex).setValue(status);
+    return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Status diperbarui di Baris " + row }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+                          navigator.clipboard.writeText(code);
+                          setCopiedScript(true);
+                          setTimeout(() => setCopiedScript(false), 2000);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 bg-white/80 hover:bg-white text-slate-600 rounded-lg text-[10px] font-bold shadow-xs border border-slate-200/50 transition-all cursor-pointer active:scale-95"
+                      >
+                        {copiedScript ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                            <span className="text-emerald-600">Disalin!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Kode</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="text-[10px] font-mono overflow-x-auto text-slate-600 max-h-[140px] leading-relaxed select-all">
+{`function doPost(e) {
+  try {
+    var params = JSON.parse(e.postData.contents);
+    var spreadsheetId = params.spreadsheetId;
+    var sheet;
+    
+    if (spreadsheetId) {
+      try {
+        sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName("Pesanan");
+      } catch (errOpen) {
+        sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pesanan");
+      }
+    } else {
+      sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pesanan");
+    }
+    
+    if (!sheet) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Tab Sheet 'Pesanan' tidak ditemukan" }));
+    }
+    
+    var orderId = params.orderId;
+    var row = parseInt(params.row);
+    var type = params.type; // "qr" atau "project"
+    var status = params.status; // "DIKONFIRMASI"
+    
+    if (isNaN(row) || row < 2) {
+      var lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+        for (var i = 0; i < data.length; i++) {
+          if (String(data[i][0]).trim() === String(orderId).trim()) {
+            row = i + 2;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (isNaN(row) || row < 2) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Invoice ID '" + orderId + "' tidak ditemukan di Sheet" }));
+    }
+    
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var colName = type === "qr" ? "STATUS_QR" : "STATUS_PROJECT";
+    var colIndex = -1;
+    
+    for (var j = 0; j < headers.length; j++) {
+      var headerStr = String(headers[j]).trim().toUpperCase();
+      if (headerStr === colName) {
+        colIndex = j + 1;
+        break;
+      }
+    }
+    
+    if (colIndex === -1) {
+      if (type === "qr") {
+        colIndex = 12; // Kolom L (STATUS_QR)
+      } else {
+        colIndex = 14; // Kolom N (STATUS_PROJECT)
+      }
+    }
+    
+    sheet.getRange(row, colIndex).setValue(status);
+    return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Status diperbarui" }));
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }));
+  }
+}`}
+                    </pre>
+                  </div>
+                  
+                  <p className="text-slate-400 font-sans mt-2">
+                    Setelah kode ditempelkan di Apps Script Spreadsheet:
+                    <ol className="list-decimal pl-4 mt-1 space-y-1">
+                      <li>Klik <b>Terapkan (Deploy) &gt; Penerapan baru (New deployment)</b>.</li>
+                      <li>Pilih jenis penerapan: <b>Aplikasi Web (Web App)</b>.</li>
+                      <li>Atur &ldquo;Jalankan sebagai&rdquo; ke <b>Saya (Me)</b>, dan &ldquo;Siapa yang memiliki akses&rdquo; ke <b>Siapa saja (Anyone)</b>.</li>
+                      <li>Salin <b>URL Aplikasi Web</b> yang didapatkan, lalu simpan ke variabel <code>APPS_SCRIPT_URL</code> di panel setelan admin atau file <code>.env</code> Anda.</li>
+                    </ol>
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex-shrink-0">
               <button
                 onClick={() => setShowConfigHelp(false)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all"
+                className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/10 transition-all cursor-pointer active:scale-95"
               >
                 Saya Mengerti
               </button>
