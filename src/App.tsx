@@ -419,40 +419,9 @@ export default function App() {
   const handleConfirm = async (orderId: string, type: 'qr' | 'project', status: string) => {
     const matchingOrder = orders.find(o => o.id === orderId);
     const row = matchingOrder ? matchingOrder.gformRow : "";
-    try {
-      const response = await fetch('/api/orders/confirm', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ orderId, type, status, row })
-      });
-      if (response.ok) {
-        const result = await response.json();
-        await fetchOrders(true); // refresh silently
-        
-        if (result.syncedWithSheets) {
-          setToast({
-            type: 'success',
-            message: type === 'qr' ? 'QR berhasil dikonfirmasi!' : 'Project berhasil disesuaikan!'
-          });
-        } else {
-          setToast({
-            type: 'warning',
-            message: type === 'qr' ? 'QR berhasil dikonfirmasi secara lokal!' : 'Project berhasil disesuaikan secara lokal!'
-          });
-        }
-        return true;
-      }
-    } catch (err: any) {
-      console.error('Gagal mengirim konfirmasi ke server:', err);
-      setToast({
-        type: 'error',
-        message: `Gagal Menghubungkan ke Server: ${err.message || 'Masalah Jaringan'}`
-      });
-    }
-    
-    // Fallback locally
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
+
+    // Update local state immediately for snappy UI
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
         return {
@@ -463,6 +432,81 @@ export default function App() {
       }
       return o;
     }));
+
+    let syncedWithSheets = false;
+
+    // 1. First attempt via Express server backend API
+    try {
+      const response = await fetch('/api/orders/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ orderId, type, status, row })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.syncedWithSheets) {
+          syncedWithSheets = true;
+        }
+      } else {
+        throw new Error(`Server API returned HTTP status ${response.status}`);
+      }
+    } catch (serverErr) {
+      console.warn('[App] Backend API unavailable or failed (e.g. static GitHub Pages). Attempting direct client-side Google Apps Script fetch...', serverErr);
+
+      // 2. Direct client-side POST fallback to Google Apps Script Web App for GitHub Pages
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify({
+            action: "update_status",
+            row: row || "",
+            type: type
+          })
+        });
+        syncedWithSheets = true;
+      } catch (directErr) {
+        console.warn('[App] Direct Apps Script fetch failed, trying no-cors fetch fallback:', directErr);
+        try {
+          await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({
+              action: "update_status",
+              row: row || "",
+              type: type
+            })
+          });
+          syncedWithSheets = true;
+        } catch (noCorsErr) {
+          console.error('[App] All direct confirmation sync attempts failed:', noCorsErr);
+        }
+      }
+    }
+
+    // Refresh order list silently
+    await fetchOrders(true);
+
+    if (syncedWithSheets) {
+      setToast({
+        type: 'success',
+        message: type === 'qr' ? 'QR berhasil dikonfirmasi!' : 'Project berhasil disesuaikan!'
+      });
+    } else {
+      setToast({
+        type: 'warning',
+        message: type === 'qr' ? 'QR berhasil dikonfirmasi secara lokal!' : 'Project berhasil disesuaikan secara lokal!'
+      });
+    }
+
     return true;
   };
 
