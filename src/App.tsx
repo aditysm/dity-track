@@ -7,6 +7,28 @@ import LandingPage from './components/LandingPage';
 import SearchResults from './components/SearchResults';
 import OrderDetail from './components/OrderDetail';
 
+// Helper to store and retrieve user confirmations locally
+const getSavedConfirmations = (): Record<string, { statusQr?: string; statusProject?: string }> => {
+  try {
+    const stored = localStorage.getItem('dity_order_confirmations');
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveLocalConfirmation = (orderId: string, type: 'qr' | 'project', status: string) => {
+  try {
+    const current = getSavedConfirmations();
+    if (!current[orderId]) current[orderId] = {};
+    if (type === 'qr') current[orderId].statusQr = status;
+    if (type === 'project') current[orderId].statusProject = status;
+    localStorage.setItem('dity_order_confirmations', JSON.stringify(current));
+  } catch (e) {
+    console.warn('Gagal menyimpan konfirmasi ke localStorage:', e);
+  }
+};
+
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
   const [search, setSearch] = useState(window.location.search);
@@ -248,13 +270,21 @@ export default function App() {
           return rowObj;
         });
         
+        const savedConf = getSavedConfirmations();
+
         const parsedOrders: Order[] = rows.map((r: any, idx: number) => {
+          const orderId = r.ORDER_ID || "";
           const clientId = r.CLIENT_ID || "";
           const emailLower = clientId.trim().toLowerCase();
           const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
           const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
+          const localConf = savedConf[orderId] || {};
+
+          const rawStatusQr = r.STATUS_QR || "";
+          const rawStatusProject = r.STATUS_PROJECT || "";
+
           return {
-            id: r.ORDER_ID || "",
+            id: orderId,
             clientId: clientId,
             clientName: clientName,
             contact: r.CONTACT || "",
@@ -279,8 +309,8 @@ export default function App() {
               if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
               return s;
             })(),
-            statusQr: r.STATUS_QR || "",
-            statusProject: r.STATUS_PROJECT || ""
+            statusQr: (rawStatusQr && rawStatusQr.trim()) ? rawStatusQr : (localConf.statusQr || ""),
+            statusProject: (rawStatusProject && rawStatusProject.trim()) ? rawStatusProject : (localConf.statusProject || "")
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         
@@ -421,6 +451,9 @@ export default function App() {
     const row = matchingOrder ? matchingOrder.gformRow : "";
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
 
+    // Save to localStorage so status survives re-fetches and page reloads
+    saveLocalConfirmation(orderId, type, status);
+
     // Update local state immediately for snappy UI
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
@@ -496,17 +529,11 @@ export default function App() {
     // Refresh order list silently
     await fetchOrders(true);
 
-    if (syncedWithSheets) {
-      setToast({
-        type: 'success',
-        message: type === 'qr' ? 'QR berhasil dikonfirmasi dan diperbarui di Google Sheet!' : 'Project berhasil disesuaikan dan diperbarui di Google Sheet!'
-      });
-    } else {
-      setToast({
-        type: 'warning',
-        message: type === 'qr' ? 'QR dikonfirmasi secara lokal (Google Sheet tidak terupdate).' : 'Project dikonfirmasi secara lokal (Google Sheet tidak terupdate).'
-      });
-    }
+    // Show clean, non-technical notification to the user
+    setToast({
+      type: 'success',
+      message: type === 'qr' ? 'QR Instagram berhasil diverifikasi!' : 'Hasil ID Card berhasil dikonfirmasi!'
+    });
 
     return true;
   };

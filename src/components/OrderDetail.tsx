@@ -391,6 +391,67 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
               )}
             </div>
           </div>
+
+          {/* Status Verifikasi Desain Card */}
+          {hasIg && (
+            <div className="bg-white border border-blue-100/80 rounded-3xl p-6 shadow-xl shadow-blue-900/5 space-y-4" id="verification-status-card">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3">
+                STATUS VERIFIKASI DESAIN
+              </h3>
+
+              <div className="space-y-3 text-xs">
+                {/* QR Status */}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                    <Instagram className="w-3.5 h-3.5 text-slate-400" />
+                    <span>QR Instagram</span>
+                  </span>
+                  {order.statusQr === 'DIKONFIRMASI' ? (
+                    <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Terkonfirmasi
+                    </span>
+                  ) : order.linkQr ? (
+                    <button
+                      onClick={() => setShowQrPopup(true)}
+                      className="font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md text-[10px] hover:bg-blue-100 transition-colors cursor-pointer"
+                    >
+                      Perlu Konfirmasi
+                    </button>
+                  ) : (
+                    <span className="font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-[10px]">
+                      Menunggu Desain
+                    </span>
+                  )}
+                </div>
+
+                {/* Project Status */}
+                <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
+                  <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Hasil ID Card</span>
+                  </span>
+                  {order.statusProject === 'DIKONFIRMASI' ? (
+                    <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Terkonfirmasi
+                    </span>
+                  ) : order.linkProject ? (
+                    <button
+                      onClick={() => setShowProjectPopup(true)}
+                      className="font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md text-[10px] hover:bg-blue-100 transition-colors cursor-pointer"
+                    >
+                      Perlu Konfirmasi
+                    </button>
+                  ) : (
+                    <span className="font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-[10px]">
+                      Menunggu Hasil
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

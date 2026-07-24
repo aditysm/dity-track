@@ -313,7 +313,17 @@ app.post("/api/orders/confirm", async (req, res) => {
 
   if (APPS_SCRIPT_URL) {
     try {
-      const response = await fetch(APPS_SCRIPT_URL, {
+      const queryParams = new URLSearchParams({
+        action: "update_status",
+        row: String(row || ""),
+        orderId: String(orderId || ""),
+        type: String(type || ""),
+        status: String(status || "DIKONFIRMASI")
+      }).toString();
+
+      const targetUrl = `${APPS_SCRIPT_URL}?${queryParams}`;
+
+      const response = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -329,13 +339,17 @@ app.post("/api/orders/confirm", async (req, res) => {
 
       if (response.ok) {
         const textResponse = await response.text();
+        const lowerText = textResponse.toLowerCase();
         let result: any = null;
-        try {
-          result = JSON.parse(textResponse);
-        } catch (e) {
-          const trimmed = textResponse.trim().toUpperCase();
-          if ((trimmed === "OK" || trimmed === "SUCCESS" || trimmed.includes("SUCCESS")) && !trimmed.includes("<HTML")) {
-            result = { success: true };
+
+        if (!lowerText.includes("<html") && !lowerText.includes("<!doctype") && !lowerText.includes("script function not found") && !lowerText.includes("page not found")) {
+          try {
+            result = JSON.parse(textResponse);
+          } catch (e) {
+            const trimmed = textResponse.trim().toUpperCase();
+            if (trimmed === "OK" || trimmed === "SUCCESS" || trimmed.includes("SUCCESS")) {
+              result = { success: true };
+            }
           }
         }
 
@@ -343,7 +357,7 @@ app.post("/api/orders/confirm", async (req, res) => {
           syncedWithSheets = true;
           console.log(`[Server] Sync success to Google Sheets for order ${orderId}, row ${row || 'auto'}`);
         } else {
-          syncError = result ? (result.error || "Google Sheets returned success: false") : `Respon dari Apps Script bukan sukses`;
+          syncError = result ? (result.error || "Google Sheets returned success: false") : `Google Apps Script mengembalikan halaman HTML/error`;
           console.warn(`[Server] Google Sheets sync failed: ${syncError}`);
         }
       } else {
