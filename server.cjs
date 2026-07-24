@@ -311,12 +311,12 @@ app.post("/api/orders/confirm", async (req, res) => {
   let syncError = null;
   if (APPS_SCRIPT_URL) {
     try {
+      const targetRow = String(row || "").trim();
       const queryParams = new URLSearchParams({
         action: "update_status",
-        row: String(row || ""),
+        row: targetRow,
         type: String(type || ""),
-        status: String(status || "DIKONFIRMASI"),
-        orderId: String(orderId || "")
+        status: String(status || "DIKONFIRMASI")
       }).toString();
       const targetUrl = `${APPS_SCRIPT_URL}?${queryParams}`;
       const response = await fetch(targetUrl, {
@@ -326,11 +326,9 @@ app.post("/api/orders/confirm", async (req, res) => {
         },
         body: JSON.stringify({
           action: "update_status",
-          row: String(row || ""),
+          row: targetRow,
           type,
-          status: status || "DIKONFIRMASI",
-          orderId,
-          clientId: clientId || ""
+          status: status || "DIKONFIRMASI"
         })
       });
       if (response.ok) {
