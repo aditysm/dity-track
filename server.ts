@@ -321,7 +321,9 @@ app.post("/api/orders/confirm", async (req, res) => {
         body: JSON.stringify({
           action: "update_status",
           row: row || "",
-          type: type
+          orderId: orderId,
+          type: type,
+          status: status || "DIKONFIRMASI"
         })
       });
 
@@ -332,16 +334,16 @@ app.post("/api/orders/confirm", async (req, res) => {
           result = JSON.parse(textResponse);
         } catch (e) {
           const trimmed = textResponse.trim().toUpperCase();
-          if (trimmed === "OK" || trimmed === "SUCCESS" || trimmed.includes("SUCCESS")) {
+          if ((trimmed === "OK" || trimmed === "SUCCESS" || trimmed.includes("SUCCESS")) && !trimmed.includes("<HTML")) {
             result = { success: true };
           }
         }
 
-        if (result && result.success) {
+        if (result && (result.success === true || result.status === "success" || result.result === "success")) {
           syncedWithSheets = true;
           console.log(`[Server] Sync success to Google Sheets for order ${orderId}, row ${row || 'auto'}`);
         } else {
-          syncError = result ? (result.error || "Google Sheets returned success: false") : `Respon dari Apps Script: "${textResponse}"`;
+          syncError = result ? (result.error || "Google Sheets returned success: false") : `Respon dari Apps Script bukan sukses`;
           console.warn(`[Server] Google Sheets sync failed: ${syncError}`);
         }
       } else {

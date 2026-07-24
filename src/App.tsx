@@ -248,10 +248,10 @@ export default function App() {
           return rowObj;
         });
         
-        const parsedOrders: Order[] = rows.map((r: any) => {
+        const parsedOrders: Order[] = rows.map((r: any, idx: number) => {
           const clientId = r.CLIENT_ID || "";
           const emailLower = clientId.trim().toLowerCase();
-          const gformRow = String(r.GFORM_ROW || "").trim();
+          const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
           const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
           return {
             id: r.ORDER_ID || "",
@@ -450,15 +450,15 @@ export default function App() {
         if (result.syncedWithSheets) {
           syncedWithSheets = true;
         }
-      } else {
-        throw new Error(`Server API returned HTTP status ${response.status}`);
       }
     } catch (serverErr) {
-      console.warn('[App] Backend API unavailable or failed (e.g. static GitHub Pages). Attempting direct client-side Google Apps Script fetch...', serverErr);
+      console.warn('[App] Backend API unavailable or failed. Trying direct Google Apps Script fetch...', serverErr);
+    }
 
-      // 2. Direct client-side POST fallback to Google Apps Script Web App for GitHub Pages
+    // 2. Direct client-side fetch fallback to Google Apps Script Web App (e.g. for GitHub Pages) if server didn't sync
+    if (!syncedWithSheets) {
       try {
-        await fetch(APPS_SCRIPT_URL, {
+        const directResp = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8'
@@ -466,29 +466,30 @@ export default function App() {
           body: JSON.stringify({
             action: "update_status",
             row: row || "",
-            type: type
+            orderId: orderId,
+            type: type,
+            status: status || "DIKONFIRMASI"
           })
         });
-        syncedWithSheets = true;
-      } catch (directErr) {
-        console.warn('[App] Direct Apps Script fetch failed, trying no-cors fetch fallback:', directErr);
-        try {
-          await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-              'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify({
-              action: "update_status",
-              row: row || "",
-              type: type
-            })
-          });
-          syncedWithSheets = true;
-        } catch (noCorsErr) {
-          console.error('[App] All direct confirmation sync attempts failed:', noCorsErr);
+
+        if (directResp.ok) {
+          const respText = await directResp.text();
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(respText);
+          } catch {
+            const upper = respText.trim().toUpperCase();
+            if ((upper === 'OK' || upper === 'SUCCESS' || upper.includes('SUCCESS')) && !upper.includes('<HTML')) {
+              parsed = { success: true };
+            }
+          }
+
+          if (parsed && (parsed.success === true || parsed.status === 'success' || parsed.result === 'success')) {
+            syncedWithSheets = true;
+          }
         }
+      } catch (directErr) {
+        console.warn('[App] Direct Apps Script fetch error:', directErr);
       }
     }
 
@@ -498,12 +499,12 @@ export default function App() {
     if (syncedWithSheets) {
       setToast({
         type: 'success',
-        message: type === 'qr' ? 'QR berhasil dikonfirmasi!' : 'Project berhasil disesuaikan!'
+        message: type === 'qr' ? 'QR berhasil dikonfirmasi dan diperbarui di Google Sheet!' : 'Project berhasil disesuaikan dan diperbarui di Google Sheet!'
       });
     } else {
       setToast({
         type: 'warning',
-        message: type === 'qr' ? 'QR berhasil dikonfirmasi secara lokal!' : 'Project berhasil disesuaikan secara lokal!'
+        message: type === 'qr' ? 'QR dikonfirmasi secara lokal (Google Sheet tidak terupdate).' : 'Project dikonfirmasi secara lokal (Google Sheet tidak terupdate).'
       });
     }
 

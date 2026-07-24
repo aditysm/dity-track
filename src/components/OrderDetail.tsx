@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatCurrency, formatDateTime, getEmailDisplayName } from '../utils';
@@ -29,6 +29,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
   const [showProjectPopup, setShowProjectPopup] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ active: boolean; type: 'qr' | 'project' } | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   // Helper to parse Google Drive URLs for direct rendering
   const getGoogleDrivePreviewUrl = (url: string) => {
@@ -49,13 +50,20 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
   };
 
   const handleActionConfirm = async () => {
-    if (!confirmDialog) return;
+    if (!confirmDialog || isConfirming) return;
+    setIsConfirming(true);
     const { type } = confirmDialog;
-    const success = await onConfirm(order.id, type, 'DIKONFIRMASI');
-    if (success) {
-      setConfirmDialog(null);
-      setShowQrPopup(false);
-      setShowProjectPopup(false);
+    try {
+      const success = await onConfirm(order.id, type, 'DIKONFIRMASI');
+      if (success) {
+        setConfirmDialog(null);
+        setShowQrPopup(false);
+        setShowProjectPopup(false);
+      }
+    } catch (err) {
+      console.error('Konfirmasi gagal:', err);
+    } finally {
+      setIsConfirming(false);
     }
   };
 
@@ -574,16 +582,25 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
 
             <div className="flex gap-3 pt-2">
               <button
-                onClick={() => setConfirmDialog(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                onClick={() => !isConfirming && setConfirmDialog(null)}
+                disabled={isConfirming}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 Batal
               </button>
               <button
                 onClick={handleActionConfirm}
-                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all cursor-pointer"
+                disabled={isConfirming}
+                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                Ya, Benar
+                {isConfirming ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <span>Ya, Benar</span>
+                )}
               </button>
             </div>
           </div>
