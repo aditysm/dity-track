@@ -110,9 +110,11 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
     }
   ];
 
+  const isQrConfirmed = (order.statusQr || '').trim().toUpperCase() === 'DIKONFIRMASI';
+  const isProjectConfirmed = (order.statusProject || '').trim().toUpperCase() === 'DIKONFIRMASI';
   const hasIg = order.parsedData.ig && order.parsedData.ig !== '-';
   const isDikerjakan = order.status === 'DIKERJAKAN';
-  const showStickyBottom = isDikerjakan && hasIg && (order.statusQr !== 'DIKONFIRMASI' || order.statusProject !== 'DIKONFIRMASI');
+  const showStickyBottom = isDikerjakan && hasIg && (!isQrConfirmed || !isProjectConfirmed);
 
   return (
     <div
@@ -406,7 +408,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
                     <Instagram className="w-3.5 h-3.5 text-slate-400" />
                     <span>QR Instagram</span>
                   </span>
-                  {order.statusQr === 'DIKONFIRMASI' ? (
+                  {isQrConfirmed ? (
                     <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" />
                       Terkonfirmasi
@@ -431,7 +433,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
                     <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
                     <span>Hasil ID Card</span>
                   </span>
-                  {order.statusProject === 'DIKONFIRMASI' ? (
+                  {isProjectConfirmed ? (
                     <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" />
                       Terkonfirmasi
@@ -460,16 +462,16 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-3.5 px-4 md:px-8 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] z-40 flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-up">
           <div className="flex flex-col text-center sm:text-left">
             <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest font-mono">
-              {order.statusQr !== 'DIKONFIRMASI' ? 'Tahap 1: Verifikasi QR' : 'Tahap 2: Hasil ID Card'}
+              {!isQrConfirmed ? 'Tahap 1: Verifikasi QR' : 'Tahap 2: Hasil ID Card'}
             </span>
             <span className="text-xs text-slate-500 font-sans mt-0.5">
-              {order.statusQr !== 'DIKONFIRMASI' 
+              {!isQrConfirmed 
                 ? (order.linkQr ? 'Silakan periksa dan konfirmasi QR Instagram Anda di bawah.' : 'Menunggu desainer mengunggah link QR Instagram.') 
                 : (order.linkProject ? 'Project desain selesai! Silakan periksa hasil ID Card Anda.' : 'Menunggu desainer mengunggah link hasil ID Card Anda.')}
             </span>
           </div>
 
-          {order.statusQr !== 'DIKONFIRMASI' ? (
+          {!isQrConfirmed ? (
             <button
               onClick={() => {
                 setImageError(false);

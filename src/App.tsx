@@ -149,7 +149,7 @@ export default function App() {
       // 2. Direct client-side Google Sheets Visualization API fetch
       const SPREADSHEET_ID = "1jdwDEOGPDTWyj2buJTUfv-pm0FoBlkcIQ5ofWgHasyU";
       const SHEET_NAME = "Pesanan";
-      const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+      const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}&_t=${Date.now()}`;
       
       try {
         const emailToNameMap: Record<string, string> = {
@@ -168,7 +168,7 @@ export default function App() {
         };
         
         try {
-          const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}`;
+          const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}&_t=${Date.now()}`;
           const resp = await fetch(responsesUrl);
           if (resp.ok) {
             const respText = await resp.text();
@@ -247,43 +247,69 @@ export default function App() {
           });
           return rowObj;
         });
+
+        const getCellByCol = (rObj: any, rawCells: any[], possibleKeys: string[], colIdx: number) => {
+          for (const k of Object.keys(rObj)) {
+            const normK = k.toUpperCase().replace(/[\s_]/g, '');
+            for (const pk of possibleKeys) {
+              if (normK === pk.toUpperCase().replace(/[\s_]/g, '')) {
+                const val = String(rObj[k] || '').trim();
+                if (val) return val;
+              }
+            }
+          }
+          if (rawCells && rawCells[colIdx]) {
+            const cell = rawCells[colIdx];
+            if (cell && cell.v !== null && cell.v !== undefined) {
+              return String(cell.v).trim();
+            }
+          }
+          return "";
+        };
         
-        const parsedOrders: Order[] = rows.map((r: any, idx: number) => {
-          const orderId = r.ORDER_ID || "";
-          const clientId = r.CLIENT_ID || "";
+        const parsedOrders: Order[] = data.table.rows.map((rRaw: any, idx: number) => {
+          const rObj = rows[idx] || {};
+          const rawCells = rRaw ? rRaw.c : [];
+
+          const orderId = getCellByCol(rObj, rawCells, ["ORDER_ID", "ID", "INVOICE"], 0) || String(rObj.ORDER_ID || "");
+          const clientId = getCellByCol(rObj, rawCells, ["CLIENT_ID", "EMAIL"], 1) || String(rObj.CLIENT_ID || "");
           const emailLower = clientId.trim().toLowerCase();
-          const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
+          const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 16) || String(idx + 2);
           const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
 
-          const rawStatusQr = r.STATUS_QR || "";
-          const rawStatusProject = r.STATUS_PROJECT || "";
+          const rawStatusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 11);
+          const rawStatusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 13);
+          const rawStatusOrder = getCellByCol(rObj, rawCells, ["STATUS"], 3) || "DIPROSES";
+          const contact = getCellByCol(rObj, rawCells, ["CONTACT"], 2);
+          const totalPrice = getCellByCol(rObj, rawCells, ["TOTAL_PRICE"], 4) || "0";
+          const createdAt = getCellByCol(rObj, rawCells, ["CREATED_AT"], 5);
+          const finishedAt = getCellByCol(rObj, rawCells, ["FINISHED_AT"], 6) || "-";
+          const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
+
+          const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "_QR", "QR_LINK"], 8);
+          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "LINK_PROJECT1", "PROJECT_LINK"], 9);
+
+          const cleanLink = (val: string) => {
+            const s = String(val || "").trim();
+            if (s === "" || s === "-") return "";
+            if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
+            return s;
+          };
 
           return {
             id: orderId,
             clientId: clientId,
             clientName: clientName,
-            contact: r.CONTACT || "",
-            status: (r.STATUS || "DIPROSES") as Order['status'],
-            totalPrice: r.TOTAL_PRICE || "0",
-            createdAt: r.CREATED_AT || "",
-            finishedAt: r.FINISHED_AT || "-",
-            orderData: r.ORDER_DATA || "",
+            contact: contact,
+            status: (rawStatusOrder || "DIPROSES") as Order['status'],
+            totalPrice: totalPrice,
+            createdAt: createdAt,
+            finishedAt: finishedAt,
+            orderData: orderData,
             gformRow: gformRow,
-            parsedData: parseOrderData(r.ORDER_DATA || ""),
-            linkQr: (() => {
-              const val = r.LINK_QR || r._QR || r.QR_LINK || "";
-              const s = String(val).trim();
-              if (s === "" || s === "-") return "";
-              if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
-              return s;
-            })(),
-            linkProject: (() => {
-              const val = r.LINK_PROJECT || r.LINK_PROJECT1 || "";
-              const s = String(val).trim();
-              if (s === "" || s === "-") return "";
-              if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
-              return s;
-            })(),
+            parsedData: parseOrderData(orderData),
+            linkQr: cleanLink(rawLinkQr),
+            linkProject: cleanLink(rawLinkProject),
             statusQr: rawStatusQr || "",
             statusProject: rawStatusProject || ""
           };

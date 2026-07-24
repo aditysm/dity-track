@@ -92,7 +92,7 @@ const MOCK_ORDERS = [
 app.get("/api/orders", async (req, res) => {
   const SPREADSHEET_ID = (process.env.SPREADSHEET_ID || "1jdwDEOGPDTWyj2buJTUfv-pm0FoBlkcIQ5ofWgHasyU").trim();
   const SHEET_NAME = "Pesanan";
-  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}&_t=${Date.now()}`;
 
   // Parallel fetch or best-effort fetch of Form Responses 1 for email-to-name mapping
   let emailToNameMap: Record<string, string> = {
@@ -111,7 +111,7 @@ app.get("/api/orders", async (req, res) => {
   };
 
   try {
-    const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}`;
+    const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}&_t=${Date.now()}`;
     const resp = await fetch(responsesUrl);
     if (resp.ok) {
       const respText = await resp.text();
@@ -205,16 +205,37 @@ app.get("/api/orders", async (req, res) => {
       return rowObj;
     });
 
+    const getCellByCol = (rObj: any, rawCells: any[], possibleKeys: string[], colIdx: number) => {
+      for (const k of Object.keys(rObj)) {
+        const normK = k.toUpperCase().replace(/[\s_]/g, '');
+        for (const pk of possibleKeys) {
+          if (normK === pk.toUpperCase().replace(/[\s_]/g, '')) {
+            const val = String(rObj[k] || '').trim();
+            if (val) return val;
+          }
+        }
+      }
+      if (rawCells && rawCells[colIdx]) {
+        const cell = rawCells[colIdx];
+        if (cell && cell.v !== null && cell.v !== undefined) {
+          return String(cell.v).trim();
+        }
+      }
+      return "";
+    };
+
     // Map rows to ensure keys are exactly matching our schema, integrating real CLIENT_NAME
-    const formattedOrders = rows.map((r: any, idx: number) => {
-      const orderId = r.ORDER_ID || "";
-      const clientId = r.CLIENT_ID || "";
+    const formattedOrders = data.table.rows.map((rRaw: any, idx: number) => {
+      const rObj = rows[idx] || {};
+      const rawCells = rRaw ? rRaw.c : [];
+
+      const orderId = getCellByCol(rObj, rawCells, ["ORDER_ID", "ID", "INVOICE"], 0) || String(rObj.ORDER_ID || "");
+      const clientId = getCellByCol(rObj, rawCells, ["CLIENT_ID", "EMAIL"], 1) || String(rObj.CLIENT_ID || "");
       const emailLower = clientId.trim().toLowerCase();
-      // If GFORM_ROW is not a column, use idx + 2 (since index 0 of rows is spreadsheet row 2)
-      const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
+      
+      const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 16) || String(idx + 2);
       const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
       
-      // Resilient column mapping with placeholder cleanup
       const cleanLink = (val: any) => {
         if (!val) return "";
         const s = String(val).trim();
@@ -225,21 +246,30 @@ app.get("/api/orders", async (req, res) => {
         return s;
       };
 
-      const linkQr = cleanLink(r.LINK_QR || r._QR || r.QR_LINK);
-      const linkProject = cleanLink(r.LINK_PROJECT || r.LINK_PROJECT1);
-      const statusQr = r.STATUS_QR || "";
-      const statusProject = r.STATUS_PROJECT || "";
+      const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "_QR", "QR_LINK"], 8);
+      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "LINK_PROJECT1", "PROJECT_LINK"], 9);
+      const linkQr = cleanLink(rawLinkQr);
+      const linkProject = cleanLink(rawLinkProject);
+
+      const statusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 11);
+      const statusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 13);
+      const statusOrder = getCellByCol(rObj, rawCells, ["STATUS"], 3) || "DIPROSES";
+      const contact = getCellByCol(rObj, rawCells, ["CONTACT"], 2);
+      const totalPrice = getCellByCol(rObj, rawCells, ["TOTAL_PRICE"], 4) || "0";
+      const createdAt = getCellByCol(rObj, rawCells, ["CREATED_AT"], 5);
+      const finishedAt = getCellByCol(rObj, rawCells, ["FINISHED_AT"], 6) || "-";
+      const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
 
       return {
         ORDER_ID: orderId,
         CLIENT_ID: clientId,
         CLIENT_NAME: clientName,
-        CONTACT: r.CONTACT || "",
-        STATUS: r.STATUS || "DIPROSES",
-        TOTAL_PRICE: r.TOTAL_PRICE || "0",
-        CREATED_AT: r.CREATED_AT || "",
-        FINISHED_AT: r.FINISHED_AT || "-",
-        ORDER_DATA: r.ORDER_DATA || "",
+        CONTACT: contact,
+        STATUS: statusOrder,
+        TOTAL_PRICE: totalPrice,
+        CREATED_AT: createdAt,
+        FINISHED_AT: finishedAt,
+        ORDER_DATA: orderData,
         GFORM_ROW: gformRow,
         LINK_QR: linkQr,
         LINK_PROJECT: linkProject,
