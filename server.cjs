@@ -106,7 +106,6 @@ var MOCK_ORDERS = [
     STATUS_PROJECT: ""
   }
 ];
-var confirmations = {};
 app.get("/api/orders", async (req, res) => {
   const SPREADSHEET_ID = (process.env.SPREADSHEET_ID || "1jdwDEOGPDTWyj2buJTUfv-pm0FoBlkcIQ5ofWgHasyU").trim();
   const SHEET_NAME = "Pesanan";
@@ -214,7 +213,6 @@ app.get("/api/orders", async (req, res) => {
       const emailLower = clientId.trim().toLowerCase();
       const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
       const clientName = gformRow && rowToNameMap[gformRow] || emailToNameMap[emailLower] || "";
-      const override = confirmations[orderId] || {};
       const cleanLink = (val) => {
         if (!val) return "";
         const s = String(val).trim();
@@ -226,8 +224,8 @@ app.get("/api/orders", async (req, res) => {
       };
       const linkQr = cleanLink(r.LINK_QR || r._QR || r.QR_LINK);
       const linkProject = cleanLink(r.LINK_PROJECT || r.LINK_PROJECT1);
-      const statusQr = override.statusQr || r.STATUS_QR || "";
-      const statusProject = override.statusProject || r.STATUS_PROJECT || "";
+      const statusQr = r.STATUS_QR || "";
+      const statusProject = r.STATUS_PROJECT || "";
       return {
         ORDER_ID: orderId,
         CLIENT_ID: clientId,
@@ -257,12 +255,11 @@ app.get("/api/orders", async (req, res) => {
     const fallbackOrdersWithNames = MOCK_ORDERS.map((o) => {
       const gformRow = String(o.GFORM_ROW || "").trim();
       const clientName = gformRow && rowToNameMap[gformRow] || emailToNameMap[o.CLIENT_ID.toLowerCase()] || "";
-      const override = confirmations[o.ORDER_ID] || {};
       return {
         ...o,
         CLIENT_NAME: clientName,
-        STATUS_QR: override.statusQr || o.STATUS_QR || "",
-        STATUS_PROJECT: override.statusProject || o.STATUS_PROJECT || ""
+        STATUS_QR: o.STATUS_QR || "",
+        STATUS_PROJECT: o.STATUS_PROJECT || ""
       };
     });
     return res.json({
@@ -277,17 +274,9 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 app.post("/api/orders/confirm", async (req, res) => {
-  const { orderId, type, status, row } = req.body;
+  const { orderId, clientId, type, status, row } = req.body;
   if (!orderId || !type || !status) {
     return res.status(400).json({ success: false, message: "Informasi konfirmasi tidak lengkap" });
-  }
-  if (!confirmations[orderId]) {
-    confirmations[orderId] = {};
-  }
-  if (type === "qr") {
-    confirmations[orderId].statusQr = status;
-  } else if (type === "project") {
-    confirmations[orderId].statusProject = status;
   }
   const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
   let syncedWithSheets = false;
@@ -297,9 +286,9 @@ app.post("/api/orders/confirm", async (req, res) => {
       const queryParams = new URLSearchParams({
         action: "update_status",
         row: String(row || ""),
-        orderId: String(orderId || ""),
         type: String(type || ""),
-        status: String(status || "DIKONFIRMASI")
+        status: String(status || "DIKONFIRMASI"),
+        orderId: String(orderId || "")
       }).toString();
       const targetUrl = `${APPS_SCRIPT_URL}?${queryParams}`;
       const response = await fetch(targetUrl, {
@@ -309,10 +298,11 @@ app.post("/api/orders/confirm", async (req, res) => {
         },
         body: JSON.stringify({
           action: "update_status",
-          row: row || "",
-          orderId,
+          row: String(row || ""),
           type,
-          status: status || "DIKONFIRMASI"
+          status: status || "DIKONFIRMASI",
+          orderId,
+          clientId: clientId || ""
         })
       });
       if (response.ok) {
@@ -333,7 +323,7 @@ app.post("/api/orders/confirm", async (req, res) => {
           syncedWithSheets = true;
           console.log(`[Server] Sync success to Google Sheets for order ${orderId}, row ${row || "auto"}`);
         } else {
-          syncError = result ? result.error || "Google Sheets returned success: false" : `Google Apps Script mengembalikan halaman HTML/error`;
+          syncError = result ? result.error || "Google Sheets returned success: false" : `Google Apps Script returned invalid response`;
           console.warn(`[Server] Google Sheets sync failed: ${syncError}`);
         }
       } else {
@@ -346,11 +336,9 @@ app.post("/api/orders/confirm", async (req, res) => {
     }
   }
   return res.json({
-    success: true,
-    message: syncedWithSheets ? `Status ${type.toUpperCase()} berhasil dikonfirmasi dan disimpan langsung ke Google Sheet!` : `Status ${type.toUpperCase()} dikonfirmasi secara lokal (Menunggu konfigurasi APPS_SCRIPT_URL)`,
+    success: syncedWithSheets,
     syncedWithSheets,
-    syncError,
-    confirmation: confirmations[orderId]
+    syncError
   });
 });
 async function bootstrap() {
