@@ -477,9 +477,7 @@ export default function App() {
         },
         body: JSON.stringify({
           orderId,
-          clientId,
           type,
-          column: targetColumn,
           status,
           row
         })
@@ -502,8 +500,7 @@ export default function App() {
           action: "update_status",
           row: String(row || ""),
           type: type,
-          status: status || "DIKONFIRMASI",
-          orderId: String(orderId || "")
+          status: status || "DIKONFIRMASI"
         }).toString();
 
         const directResp = await fetch(`${APPS_SCRIPT_URL}?${queryParams}`, {
@@ -515,9 +512,7 @@ export default function App() {
             action: "update_status",
             row: String(row || ""),
             type: type,
-            status: status || "DIKONFIRMASI",
-            orderId: orderId,
-            clientId: clientId || ""
+            status: status || "DIKONFIRMASI"
           })
         });
 
