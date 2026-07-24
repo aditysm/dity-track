@@ -7,28 +7,6 @@ import LandingPage from './components/LandingPage';
 import SearchResults from './components/SearchResults';
 import OrderDetail from './components/OrderDetail';
 
-// Helper to store and retrieve user confirmations locally
-const getSavedConfirmations = (): Record<string, { statusQr?: string; statusProject?: string }> => {
-  try {
-    const stored = localStorage.getItem('dity_order_confirmations');
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
-  }
-};
-
-const saveLocalConfirmation = (orderId: string, type: 'qr' | 'project', status: string) => {
-  try {
-    const current = getSavedConfirmations();
-    if (!current[orderId]) current[orderId] = {};
-    if (type === 'qr') current[orderId].statusQr = status;
-    if (type === 'project') current[orderId].statusProject = status;
-    localStorage.setItem('dity_order_confirmations', JSON.stringify(current));
-  } catch (e) {
-    console.warn('Gagal menyimpan konfirmasi ke localStorage:', e);
-  }
-};
-
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
   const [search, setSearch] = useState(window.location.search);
@@ -270,15 +248,12 @@ export default function App() {
           return rowObj;
         });
         
-        const savedConf = getSavedConfirmations();
-
         const parsedOrders: Order[] = rows.map((r: any, idx: number) => {
           const orderId = r.ORDER_ID || "";
           const clientId = r.CLIENT_ID || "";
           const emailLower = clientId.trim().toLowerCase();
           const gformRow = String(r.GFORM_ROW || "").trim() || String(idx + 2);
           const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
-          const localConf = savedConf[orderId] || {};
 
           const rawStatusQr = r.STATUS_QR || "";
           const rawStatusProject = r.STATUS_PROJECT || "";
@@ -309,8 +284,8 @@ export default function App() {
               if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
               return s;
             })(),
-            statusQr: (rawStatusQr && rawStatusQr.trim()) ? rawStatusQr : (localConf.statusQr || ""),
-            statusProject: (rawStatusProject && rawStatusProject.trim()) ? rawStatusProject : (localConf.statusProject || "")
+            statusQr: rawStatusQr || "",
+            statusProject: rawStatusProject || ""
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         
@@ -449,12 +424,11 @@ export default function App() {
   const handleConfirm = async (orderId: string, type: 'qr' | 'project', status: string) => {
     const matchingOrder = orders.find(o => o.id === orderId);
     const row = matchingOrder ? matchingOrder.gformRow : "";
+    const clientId = matchingOrder ? matchingOrder.clientId : "";
+    const targetColumn = type === 'qr' ? 'STATUS_QR' : 'STATUS_PROJECT';
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
 
-    // Save to localStorage so status survives re-fetches and page reloads
-    saveLocalConfirmation(orderId, type, status);
-
-    // Update local state immediately for snappy UI
+    // Optimistically update state for snappy feedback
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
         return {
@@ -468,14 +442,21 @@ export default function App() {
 
     let syncedWithSheets = false;
 
-    // 1. First attempt via Express server backend API
+    // 1. Attempt via Express server backend API
     try {
       const response = await fetch('/api/orders/confirm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ orderId, type, status, row })
+        body: JSON.stringify({
+          orderId,
+          clientId,
+          type,
+          column: targetColumn,
+          status,
+          row
+        })
       });
 
       if (response.ok) {
@@ -488,20 +469,29 @@ export default function App() {
       console.warn('[App] Backend API unavailable or failed. Trying direct Google Apps Script fetch...', serverErr);
     }
 
-    // 2. Direct client-side fetch fallback to Google Apps Script Web App (e.g. for GitHub Pages) if server didn't sync
+    // 2. Direct client-side fetch fallback to Google Apps Script Web App
     if (!syncedWithSheets) {
       try {
-        const directResp = await fetch(APPS_SCRIPT_URL, {
+        const queryParams = new URLSearchParams({
+          action: "update_status",
+          row: String(row || ""),
+          type: type,
+          status: status || "DIKONFIRMASI",
+          orderId: String(orderId || "")
+        }).toString();
+
+        const directResp = await fetch(`${APPS_SCRIPT_URL}?${queryParams}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8'
           },
           body: JSON.stringify({
             action: "update_status",
-            row: row || "",
-            orderId: orderId,
+            row: String(row || ""),
             type: type,
-            status: status || "DIKONFIRMASI"
+            status: status || "DIKONFIRMASI",
+            orderId: orderId,
+            clientId: clientId || ""
           })
         });
 
@@ -526,16 +516,22 @@ export default function App() {
       }
     }
 
-    // Refresh order list silently
+    // Reload true data from Google Sheets
     await fetchOrders(true);
 
-    // Show clean, non-technical notification to the user
-    setToast({
-      type: 'success',
-      message: type === 'qr' ? 'QR Instagram berhasil diverifikasi!' : 'Hasil ID Card berhasil dikonfirmasi!'
-    });
-
-    return true;
+    if (syncedWithSheets) {
+      setToast({
+        type: 'success',
+        message: type === 'qr' ? 'QR Instagram berhasil diverifikasi!' : 'Hasil ID Card berhasil dikonfirmasi!'
+      });
+      return true;
+    } else {
+      setToast({
+        type: 'warning',
+        message: 'Konfirmasi tidak dapat diproses saat ini. Silakan coba beberapa saat lagi.'
+      });
+      return false;
+    }
   };
 
   const handleSelectSample = (id: string) => {
