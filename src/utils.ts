@@ -1,6 +1,38 @@
 import { Order, ParsedOrderData } from './types';
 
 /**
+ * Cleans and extracts the Instagram username from raw text or URL.
+ * Examples:
+ * - "@fhmi.dputra" -> "fhmi.dputra"
+ * - "https://www.instagram.com/fhmi.dputra?igsh=MW02N28xaGxkZnJidA%3D%3D&utm_source=qr" -> "fhmi.dputra"
+ * - "fhmi.dputra" -> "fhmi.dputra"
+ */
+export function cleanIgUsername(val: string): string {
+  if (!val || val.trim() === '' || val.trim() === '-') return '-';
+  let cleaned = val.trim();
+
+  // If it contains instagram.com URL
+  if (cleaned.toLowerCase().includes('instagram.com/')) {
+    try {
+      const parts = cleaned.split(/instagram\.com\//i);
+      if (parts[1]) {
+        const path = parts[1].split('/')[0].split('?')[0].split('#')[0].trim();
+        if (path) {
+          cleaned = path;
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+  }
+
+  // Remove leading @ symbols
+  cleaned = cleaned.replace(/^@+/, '').trim();
+
+  return cleaned || '-';
+}
+
+/**
  * Parses the raw ORDER_DATA string stored in the Google Sheets database.
  * Format: "Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra"
  */
@@ -42,7 +74,7 @@ export function parseOrderData(raw: string): ParsedOrderData {
       } else if (key.includes('jenis fak')) {
         result.jenisFak = value;
       } else if (key.includes('ig') || key.includes('instagram')) {
-        result.ig = value;
+        result.ig = cleanIgUsername(value);
       }
     }
   });

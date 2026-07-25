@@ -61,7 +61,7 @@ export default function LandingPage({
           Pantau Pesanan <span className="text-blue-500">ID Card</span> Anda
         </h1>
         <p className="text-sm md:text-base text-slate-500 font-sans leading-relaxed">
-          Masukkan Nomor Invoice atau Email Anda untuk melihat status pengerjaan ID Card secara transparan.
+          Masukkan Email atau Nomor Invoice Anda untuk melihat status pengerjaan ID Card secara transparan.
         </p>
       </div>
 
@@ -93,20 +93,20 @@ export default function LandingPage({
             <button
               type="submit"
               disabled={!searchQuery.trim()}
-              className="absolute left-2.5 top-2.5 bottom-2.5 w-11 sm:w-28 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/10 active:scale-95 focus:outline-none flex items-center justify-center cursor-pointer"
+              className="absolute left-2.5 top-2.5 bottom-2.5 w-11 sm:w-28 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/10 active:scale-95 focus:outline-none flex items-center justify-center gap-1.5 cursor-pointer"
               id="search-button-left"
               title="Cari"
             >
+              <Search className="w-4 h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Cari</span>
-              <span className="inline sm:hidden"><Search className="w-4 h-4" /></span>
             </button>
             <input
               ref={inputRef}
               type="text"
-              placeholder="Masukkan Nomor Invoice atau Email..."
+              placeholder="Masukkan Email atau Nomor Invoice..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-16 pl-16 sm:pl-32 pr-12 rounded-2xl bg-white border border-blue-100 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-300 text-slate-700 transition-all font-sans text-base shadow-inner placeholder:truncate truncate"
+              className="w-full h-16 pl-16 sm:pl-34 pr-12 rounded-2xl bg-white border border-blue-100 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-300 text-slate-700 transition-all font-sans text-base shadow-inner placeholder:truncate truncate"
               id="search-input"
             />
             {/* Clear Button on the Right */}
@@ -124,7 +124,7 @@ export default function LandingPage({
           </div>
           
           <p className="text-xs text-slate-400 text-center animate-fade-in" id="search-help">
-            Sistem mendukung pencarian otomatis multi-identifikasi.
+            Cari pesanan dengan mudah menggunakan alamat email atau nomor invoice Anda.
           </p>
         </form>
 

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard
 } from 'lucide-react';
 import { Order } from '../types';
-import { formatCurrency, formatDateTime, getEmailDisplayName } from '../utils';
+import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername } from '../utils';
 
 interface OrderDetailProps {
   order: Order;
   onBack: () => void;
-  onConfirm: (orderId: string, type: 'qr' | 'project', status: string) => Promise<boolean> | boolean;
+  onConfirm?: (orderId: string, type: 'qr' | 'project', status: string) => Promise<boolean> | boolean;
 }
 
 // Custom inline WhatsApp SVG icon
@@ -23,13 +23,10 @@ const WhatsAppIcon = () => (
   </svg>
 );
 
-export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailProps) {
+export default function OrderDetail({ order, onBack }: OrderDetailProps) {
   const [copied, setCopied] = useState(false);
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ active: boolean; type: 'qr' | 'project' } | null>(null);
-  const [imageError, setImageError] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
 
   // Helper to parse Google Drive URLs for direct rendering
   const getGoogleDrivePreviewUrl = (url: string) => {
@@ -47,24 +44,6 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
     navigator.clipboard.writeText(order.id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleActionConfirm = async () => {
-    if (!confirmDialog || isConfirming) return;
-    setIsConfirming(true);
-    const { type } = confirmDialog;
-    try {
-      const success = await onConfirm(order.id, type, 'DIKONFIRMASI');
-      if (success) {
-        setConfirmDialog(null);
-        setShowQrPopup(false);
-        setShowProjectPopup(false);
-      }
-    } catch (err) {
-      console.error('Konfirmasi gagal:', err);
-    } finally {
-      setIsConfirming(false);
-    }
   };
 
   const getStatusStepIndex = (status: Order['status']): number => {
@@ -110,21 +89,43 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
     }
   ];
 
-  const isQrConfirmed = (order.statusQr || '').trim().toUpperCase() === 'DIKONFIRMASI';
-  const isProjectConfirmed = (order.statusProject || '').trim().toUpperCase() === 'DIKONFIRMASI';
-  const hasIg = order.parsedData.ig && order.parsedData.ig !== '-';
+  const hasIg = !!(order.parsedData.ig && order.parsedData.ig !== '-');
   const isDikerjakan = order.status === 'DIKERJAKAN';
-  const showStickyBottom = isDikerjakan && hasIg && (!isQrConfirmed || !isProjectConfirmed);
+  const showStickyBottom = isDikerjakan;
+
+  const isProjectReady = !!order.linkProject;
+  const isQrReady = !!order.linkQr;
+  const isAllReady = isProjectReady && (!hasIg || isQrReady);
+
+  const getVerificationHelpText = () => {
+    if (isAllReady) {
+      return hasIg
+        ? 'Silahkan periksa QR Instagram dan Hasil ID Card Anda, laporkan jika terdapat kesalahan.'
+        : 'Silahkan periksa Hasil ID Card Anda, laporkan jika terdapat kesalahan.';
+    }
+
+    if (hasIg) {
+      if (isQrReady && !isProjectReady) {
+        return 'Desainer sedang membuat & menyiapkan ID Card Anda. Tombol lihat ID card akan aktif begitu file selesai dibuat.';
+      }
+      if (!isQrReady && isProjectReady) {
+        return 'Hasil ID Card sudah siap, sedangkan QR Instagram Anda sedang diproses oleh desainer.';
+      }
+      return 'Desainer sedang membuat & menyiapkan QR & ID Card Anda. Tombol akan aktif begitu file selesai dibuat.';
+    } else {
+      return 'Desainer sedang membuat & menyiapkan ID Card Anda. Tombol akan aktif begitu file selesai dibuat.';
+    }
+  };
 
   return (
     <div
-      className={`w-full max-w-4xl mx-auto px-4 py-6 space-y-8 ${showStickyBottom ? 'pb-28' : ''}`}
+      className={`w-full max-w-4xl mx-auto px-4 py-6 space-y-8 ${showStickyBottom ? 'pb-8 sm:pb-28' : ''}`}
       id="detail-container"
     >
       {/* Back to Results */}
       <button
         onClick={onBack}
-        className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors group"
+        className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors group cursor-pointer"
         id="btn-back-results"
       >
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -143,7 +144,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
             </span>
             <button
               onClick={handleCopyId}
-              className="p-1.5 hover:bg-slate-50 rounded-md text-slate-400 hover:text-slate-600 border border-slate-100 transition-all"
+              className="p-1.5 hover:bg-slate-50 rounded-md text-slate-400 hover:text-slate-600 border border-slate-100 transition-all cursor-pointer"
               title="Salin No. Invoice"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -165,7 +166,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
             href={buyerGroupUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all active:scale-95"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all active:scale-95 cursor-pointer"
             id="btn-join-group"
           >
             <WhatsAppIcon />
@@ -175,7 +176,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
             href={whatsappSupportUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold border border-blue-100 text-xs rounded-xl transition-all"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold border border-blue-100 text-xs rounded-xl transition-all cursor-pointer"
             id="btn-contact-admin"
           >
             <ExternalLink className="w-3.5 h-3.5" />
@@ -355,7 +356,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Username Instagram</span>
                   <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold">
                     <Instagram className="w-4 h-4 text-slate-400" />
-                    <span className="font-mono text-blue-500">{order.parsedData.ig}</span>
+                    <span className="font-mono text-blue-500">@{cleanIgUsername(order.parsedData.ig)}</span>
                   </div>
                 </div>
               )}
@@ -394,120 +395,118 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
             </div>
           </div>
 
-          {/* Status Verifikasi Desain Card */}
-          {hasIg && (
-            <div className="bg-white border border-blue-100/80 rounded-3xl p-6 shadow-xl shadow-blue-900/5 space-y-4" id="verification-status-card">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3">
-                STATUS VERIFIKASI DESAIN
-              </h3>
+          {/* Verifikasi Desain Card */}
+          <div className="bg-white border border-blue-100/80 rounded-3xl p-5 shadow-xl shadow-blue-900/5 space-y-3" id="verification-status-card">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2.5">
+              {hasIg ? 'VERIFIKASI DESAIN & ID CARD' : 'VERIFIKASI HASIL ID CARD'}
+            </h3>
 
-              <div className="space-y-3 text-xs">
-                {/* QR Status */}
+            <div className="space-y-2.5 text-xs">
+              {/* QR Instagram */}
+              {hasIg && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <span className="text-slate-600 font-medium flex items-center gap-1.5">
                     <Instagram className="w-3.5 h-3.5 text-slate-400" />
                     <span>QR Instagram</span>
                   </span>
-                  {isQrConfirmed ? (
-                    <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Terkonfirmasi
-                    </span>
-                  ) : order.linkQr ? (
-                    <button
-                      onClick={() => setShowQrPopup(true)}
-                      className="font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md text-[10px] hover:bg-blue-100 transition-colors cursor-pointer"
-                    >
-                      Perlu Konfirmasi
-                    </button>
-                  ) : (
-                    <span className="font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-[10px]">
-                      Menunggu Desain
-                    </span>
-                  )}
+                  <button
+                    onClick={() => order.linkQr && setShowQrPopup(true)}
+                    disabled={!order.linkQr}
+                    title={!order.linkQr ? "QR Instagram sedang diproses oleh desainer" : "Lihat QR Saya"}
+                    className={`w-38 justify-center font-bold px-3 py-1.5 rounded-lg text-[11px] transition-colors flex items-center gap-1.5 ${
+                      order.linkQr 
+                        ? 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 cursor-pointer' 
+                        : 'text-slate-400 bg-slate-50 border border-slate-100 opacity-60 cursor-not-allowed'
+                    }`}
+                  >
+                    <Instagram className="w-3 h-3" />
+                    <span>Lihat QR Saya</span>
+                  </button>
                 </div>
+              )}
 
-                {/* Project Status */}
-                <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
-                  <span className="text-slate-500 font-medium flex items-center gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Hasil ID Card</span>
-                  </span>
-                  {isProjectConfirmed ? (
-                    <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md text-[10px] flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Terkonfirmasi
-                    </span>
-                  ) : order.linkProject ? (
-                    <button
-                      onClick={() => setShowProjectPopup(true)}
-                      className="font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md text-[10px] hover:bg-blue-100 transition-colors cursor-pointer"
-                    >
-                      Perlu Konfirmasi
-                    </button>
-                  ) : (
-                    <span className="font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-[10px]">
-                      Menunggu Hasil
-                    </span>
-                  )}
-                </div>
+              {/* Hasil ID Card */}
+              <div className={`flex items-center justify-between ${hasIg ? 'border-t border-slate-50 pt-2.5' : ''}`}>
+                <span className="text-slate-600 font-medium flex items-center gap-1.5">
+                  <IdCard className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Hasil ID Card</span>
+                </span>
+                <button
+                  onClick={() => order.linkProject && setShowProjectPopup(true)}
+                  disabled={!order.linkProject}
+                  title={!order.linkProject ? "Desainer sedang membuat & menyiapkan ID Card Anda" : "Lihat ID Card Saya"}
+                  className={`w-38 justify-center font-bold px-3 py-1.5 rounded-lg text-[11px] transition-colors flex items-center gap-1.5 ${
+                    order.linkProject 
+                      ? 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 cursor-pointer' 
+                      : 'text-slate-400 bg-slate-50 border border-slate-100 opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <IdCard className="w-3 h-3" />
+                  <span>Lihat ID Card Saya</span>
+                </button>
+              </div>
+
+              {/* Info Note */}
+              <div className="border-t border-slate-50 pt-2.5">
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  {getVerificationHelpText()}
+                </p>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Sticky Bottom Bar */}
+      {/* Sticky Bottom Bar (Desktop Only) */}
       {showStickyBottom && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-3.5 px-4 md:px-8 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] z-40 flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-up">
-          <div className="flex flex-col text-center sm:text-left">
-            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest font-mono">
-              {!isQrConfirmed ? 'Tahap 1: Verifikasi QR' : 'Tahap 2: Hasil ID Card'}
+        <div className="hidden sm:flex fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 py-3.5 px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-40 items-center justify-between gap-4 animate-slide-up">
+          <div className="flex flex-col text-left min-w-0">
+            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider font-mono">
+              {hasIg ? 'Verifikasi QR & Hasil ID Card' : 'Verifikasi Hasil ID Card'}
             </span>
-            <span className="text-xs text-slate-500 font-sans mt-0.5">
-              {!isQrConfirmed 
-                ? (order.linkQr ? 'Silakan periksa dan konfirmasi QR Instagram Anda di bawah.' : 'Menunggu desainer mengunggah link QR Instagram.') 
-                : (order.linkProject ? 'Project desain selesai! Silakan periksa hasil ID Card Anda.' : 'Menunggu desainer mengunggah link hasil ID Card Anda.')}
+            <span className="text-xs text-slate-500 font-sans mt-0.5 leading-tight">
+              {getVerificationHelpText()}
             </span>
           </div>
 
-          {!isQrConfirmed ? (
+          <div className="flex items-center gap-2 shrink-0">
+            {hasIg && (
+              <button
+                onClick={() => order.linkQr && setShowQrPopup(true)}
+                disabled={!order.linkQr}
+                title={!order.linkQr ? "QR Instagram sedang diproses oleh desainer" : "Lihat QR Saya"}
+                className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                  order.linkQr 
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-xs shadow-blue-500/15 cursor-pointer active:scale-95' 
+                    : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed border border-slate-200/50'
+                }`}
+              >
+                <Instagram className="w-3.5 h-3.5" />
+                <span>Lihat QR Saya</span>
+              </button>
+            )}
+
             <button
-              onClick={() => {
-                setImageError(false);
-                setShowQrPopup(true);
-              }}
-              disabled={!order.linkQr}
-              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
-                order.linkQr 
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/15 cursor-pointer active:scale-95' 
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Instagram className="w-4 h-4" />
-              <span>Lihat QR Saya</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowProjectPopup(true)}
+              onClick={() => order.linkProject && setShowProjectPopup(true)}
               disabled={!order.linkProject}
-              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+              title={!order.linkProject ? "Desainer sedang membuat & menyiapkan ID Card Anda" : "Lihat ID Card Saya"}
+              className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
                 order.linkProject 
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/15 cursor-pointer active:scale-95' 
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-600/15 cursor-pointer active:scale-95' 
+                  : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed border border-slate-200/50'
               }`}
             >
-              <ExternalLink className="w-4 h-4" />
+              <IdCard className="w-3.5 h-3.5" />
               <span>Lihat ID Card Saya</span>
             </button>
-          )}
+          </div>
         </div>
       )}
 
       {/* POPUP 1: QR INSTAGRAM */}
       {showQrPopup && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-6">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-6 animate-scale-up">
             <button 
               onClick={() => setShowQrPopup(false)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all cursor-pointer"
@@ -517,50 +516,52 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
 
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-800 font-display">Verifikasi QR Instagram</h3>
-              <p className="text-xs text-slate-400">Silakan periksa QR Instagram untuk akun {order.parsedData.ig} melalui tombol di bawah ini.</p>
+              <p className="text-xs text-slate-500">Silahkan periksa QR Instagram Anda, laporkan jika terdapat kesalahan.</p>
             </div>
 
-            <div className="p-6 bg-blue-50/50 border border-blue-100/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
+            <div className="p-6 bg-blue-50/50 border border-blue-100/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
                 <Instagram className="w-6 h-6" />
               </div>
               <div className="space-y-1 max-w-xs">
                 <p className="font-bold text-sm text-slate-800">Tautan QR Instagram</p>
-                <p className="text-xs text-slate-400 font-sans">Kode QR Instagram dapat diakses langsung secara online.</p>
+                <p className="text-xs text-slate-400 font-sans">
+                  Kode QR Instagram untuk akun {order.parsedData.ig && order.parsedData.ig !== '-' ? `@${cleanIgUsername(order.parsedData.ig)}` : 'Instagram'} dapat diakses langsung secara online.
+                </p>
               </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
               {order.linkQr ? (
                 <a
                   href={order.linkQr}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/15 active:scale-95 cursor-pointer"
+                  className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/15 transition-all flex items-center justify-center gap-2 text-center active:scale-98 cursor-pointer"
                 >
                   <span>Buka QR Instagram Saya</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-4 h-4" />
                 </a>
               ) : (
-                <p className="text-xs text-amber-600 font-bold">Tautan QR belum siap.</p>
+                <button
+                  disabled
+                  className="w-full py-3 px-4 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl cursor-not-allowed text-center"
+                >
+                  Tautan QR Belum Siap
+                </button>
               )}
-            </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={() => setConfirmDialog({ active: true, type: 'qr' })}
-                className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-              >
-                <CheckCircle2 className="w-4.5 h-4.5" />
-                <span>QR Sudah Benar</span>
-              </button>
-              
-              <a
-                href={`https://wa.me/62895634048237?text=${encodeURIComponent(`Halo Admin, saya ingin melaporkan bahwa QR pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*) salah. Mohon bantuannya.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-3 px-4 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md shadow-rose-500/10 transition-all flex items-center justify-center gap-1.5 text-center"
-              >
-                <AlertTriangle className="w-4.5 h-4.5" />
-                <span>Laporkan QR Salah</span>
-              </a>
+              <div className="text-center text-xs text-slate-500 font-medium pt-1">
+                <span>Ada yang salah? </span>
+                <a
+                  href={`https://wa.me/62895634048237?text=${encodeURIComponent(`Halo Admin, saya ingin melaporkan bahwa QR Instagram pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*) terdapat kesalahan. Mohon bantuannya.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-rose-600 hover:text-rose-700 font-bold underline underline-offset-2 transition-colors inline-flex items-center gap-0.5"
+                >
+                  Laporkan kesalahan
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -569,7 +570,7 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
       {/* POPUP 2: PROJECT ID CARD */}
       {showProjectPopup && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-6">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-6 animate-scale-up">
             <button 
               onClick={() => setShowProjectPopup(false)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all cursor-pointer"
@@ -579,92 +580,50 @@ export default function OrderDetail({ order, onBack, onConfirm }: OrderDetailPro
 
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-800 font-display">Hasil ID Card Anda</h3>
-              <p className="text-xs text-slate-400">Projek ID Card Anda sudah selesai dibuat. Silakan periksa melalui tombol di bawah ini.</p>
+              <p className="text-xs text-slate-500">Silahkan periksa hasil ID Card Anda, laporkan jika terdapat kesalahan.</p>
             </div>
 
-            <div className="p-6 bg-blue-50/50 border border-blue-100/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
+            <div className="p-6 bg-blue-50/50 border border-blue-100/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
-                <ExternalLink className="w-6 h-6" />
+                <IdCard className="w-6 h-6" />
               </div>
               <div className="space-y-1 max-w-xs">
                 <p className="font-bold text-sm text-slate-800">Tautan Desain Projek</p>
                 <p className="text-xs text-slate-400">Desain lengkap ID Card dapat diakses langsung secara online.</p>
               </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
               {order.linkProject ? (
                 <a
                   href={order.linkProject}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/15 active:scale-95 cursor-pointer"
+                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/15 transition-all flex items-center justify-center gap-2 text-center active:scale-98 cursor-pointer"
                 >
                   <span>Buka Desain Saya</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-4 h-4" />
                 </a>
               ) : (
-                <p className="text-xs text-amber-600 font-bold">Link desain belum siap.</p>
+                <button
+                  disabled
+                  className="w-full py-3 px-4 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl cursor-not-allowed text-center"
+                >
+                  Tautan Desain Belum Siap
+                </button>
               )}
-            </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={() => setConfirmDialog({ active: true, type: 'project' })}
-                className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-              >
-                <CheckCircle2 className="w-4.5 h-4.5" />
-                <span>Desain Sudah Benar</span>
-              </button>
-              
-              <a
-                href={`https://wa.me/62895634048237?text=${encodeURIComponent(`Halo Admin, saya ingin melaporkan bahwa Project ID Card pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*) salah. Mohon bantuannya.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-3 px-4 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md shadow-rose-500/10 transition-all flex items-center justify-center gap-1.5 text-center"
-              >
-                <AlertTriangle className="w-4.5 h-4.5" />
-                <span>Laporkan ID Card Salah</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP 3: OVERALL CONFIRMATION BOX */}
-      {confirmDialog?.active && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full border border-slate-100 p-6 shadow-2xl text-center space-y-4 animate-scale-up">
-            <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center mx-auto shadow-inner">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h4 className="font-bold text-slate-800 text-base font-display">Konfirmasi Persetujuan</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Apakah Anda yakin data ini sudah benar? Setelah dikonfirmasi, data tidak dapat diubah kembali.
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => !isConfirming && setConfirmDialog(null)}
-                disabled={isConfirming}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleActionConfirm}
-                disabled={isConfirming}
-                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-              >
-                {isConfirming ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Memproses...</span>
-                  </>
-                ) : (
-                  <span>Ya, Benar</span>
-                )}
-              </button>
+              <div className="text-center text-xs text-slate-500 font-medium pt-1">
+                <span>Ada yang salah? </span>
+                <a
+                  href={`https://wa.me/62895634048237?text=${encodeURIComponent(`Halo Admin, saya ingin melaporkan bahwa Project ID Card pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*) terdapat kesalahan. Mohon bantuannya.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-rose-600 hover:text-rose-700 font-bold underline underline-offset-2 transition-colors inline-flex items-center gap-0.5"
+                >
+                  Laporkan kesalahan
+                </a>
+              </div>
             </div>
           </div>
         </div>

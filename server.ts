@@ -246,8 +246,8 @@ app.get("/api/orders", async (req, res) => {
         return s;
       };
 
-      const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "_QR", "QR_LINK"], 8);
-      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "LINK_PROJECT1", "PROJECT_LINK"], 9);
+      const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "QR_LINK", "LINKQR"], 9);
+      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 11);
       const linkQr = cleanLink(rawLinkQr);
       const linkProject = cleanLink(rawLinkProject);
 

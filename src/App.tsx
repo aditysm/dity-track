@@ -253,8 +253,7 @@ export default function App() {
             const normK = k.toUpperCase().replace(/[\s_]/g, '');
             for (const pk of possibleKeys) {
               if (normK === pk.toUpperCase().replace(/[\s_]/g, '')) {
-                const val = String(rObj[k] || '').trim();
-                if (val) return val;
+                return String(rObj[k] || '').trim();
               }
             }
           }
@@ -274,10 +273,10 @@ export default function App() {
           const orderId = getCellByCol(rObj, rawCells, ["ORDER_ID", "ID", "INVOICE"], 0) || String(rObj.ORDER_ID || "");
           const clientId = getCellByCol(rObj, rawCells, ["CLIENT_ID", "EMAIL"], 1) || String(rObj.CLIENT_ID || "");
           const emailLower = clientId.trim().toLowerCase();
-          const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 16) || String(idx + 2);
+          const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 8) || String(idx + 2);
           const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
 
-          const rawStatusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 11);
+          const rawStatusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 12);
           const rawStatusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 13);
           const rawStatusOrder = getCellByCol(rObj, rawCells, ["STATUS"], 3) || "DIPROSES";
           const contact = getCellByCol(rObj, rawCells, ["CONTACT"], 2);
@@ -286,8 +285,8 @@ export default function App() {
           const finishedAt = getCellByCol(rObj, rawCells, ["FINISHED_AT"], 6) || "-";
           const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
 
-          const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "_QR", "QR_LINK"], 8);
-          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "LINK_PROJECT1", "PROJECT_LINK"], 9);
+          const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "QR_LINK", "LINKQR"], 9);
+          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 11);
 
           const cleanLink = (val: string) => {
             const s = String(val || "").trim();
@@ -395,15 +394,21 @@ export default function App() {
   const urlSearchQuery = useMemo(() => searchParams.get('query') || '', [searchParams]);
   const urlSelectedOrderId = useMemo(() => searchParams.get('id') || '', [searchParams]);
 
-  // Filter orders based on query parameter
+  // Filter orders based on query parameter (exact matching for full ID or full Email)
   const filteredOrders = useMemo(() => {
     if (!urlSearchQuery.trim()) return [];
     
     const cleanQuery = urlSearchQuery.trim().toLowerCase();
     return orders.filter(order => {
-      const matchId = order.id.toLowerCase().includes(cleanQuery);
-      const matchEmail = order.clientId.toLowerCase().includes(cleanQuery);
-      return matchId || matchEmail;
+      const matchId = order.id.trim().toLowerCase() === cleanQuery;
+      const matchEmail = order.clientId.trim().toLowerCase() === cleanQuery;
+      const matchContact = order.contact ? order.contact.trim().toLowerCase() === cleanQuery : false;
+      const matchName = order.clientName ? order.clientName.trim().toLowerCase() === cleanQuery : false;
+      const cleanQueryNoAt = cleanQuery.replace(/^@+/, '');
+      const orderIgNoAt = order.parsedData?.ig ? order.parsedData.ig.trim().toLowerCase().replace(/^@+/, '') : '';
+      const matchIg = orderIgNoAt ? orderIgNoAt === cleanQueryNoAt : false;
+
+      return matchId || matchEmail || matchContact || matchName || matchIg;
     });
   }, [urlSearchQuery, orders]);
 
@@ -412,12 +417,8 @@ export default function App() {
     if (!urlSelectedOrderId) return null;
     const cleanId = urlSelectedOrderId.trim().toLowerCase();
     
-    // First try exact invoice id match
-    let found = orders.find(o => o.id.toLowerCase() === cleanId);
-    if (!found) {
-      // If the ID is combined or a substring, try matching
-      found = orders.find(o => cleanId.includes(o.id.toLowerCase()) || o.id.toLowerCase().includes(cleanId));
-    }
+    // Exact invoice id match or exact email match
+    let found = orders.find(o => o.id.trim().toLowerCase() === cleanId || o.clientId.trim().toLowerCase() === cleanId);
     return found || null;
   }, [urlSelectedOrderId, orders]);
 

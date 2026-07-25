@@ -108,20 +108,20 @@ export default function SearchResults({ query, results, onBack, onSelectOrder, o
             <button
               type="submit"
               disabled={!searchQuery.trim()}
-              className="absolute left-1.5 top-1.5 bottom-1.5 px-3 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 text-white font-bold text-[11px] rounded-lg transition-all active:scale-95 focus:outline-none flex items-center justify-center cursor-pointer"
+              className="absolute left-1.5 top-1.5 bottom-1.5 w-9 sm:w-24 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 text-white font-bold text-[11px] rounded-lg transition-all active:scale-95 focus:outline-none flex items-center justify-center gap-1.5 cursor-pointer"
               id="results-search-button-left"
               title="Cari"
             >
+              <Search className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="hidden sm:inline">Cari</span>
-              <span className="inline sm:hidden"><Search className="w-3.5 h-3.5" /></span>
             </button>
             <input
               ref={inputRef}
               type="text"
-              placeholder="Masukkan Nomor Invoice atau Email Anda..."
+              placeholder="Masukkan Email atau Nomor Invoice..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-11 pl-14 sm:pl-16 pr-10 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 text-slate-700 transition-all font-sans text-xs placeholder:truncate truncate"
+              className="w-full h-11 pl-12 sm:pl-28 pr-10 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 text-slate-700 transition-all font-sans text-xs placeholder:truncate truncate"
               id="results-search-input"
             />
             {/* Clear Button on the Right */}
