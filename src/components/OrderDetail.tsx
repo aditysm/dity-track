@@ -307,136 +307,6 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right Column: Specifications & Billing Summary */}
-        <div className="space-y-6" id="detail-specs-col">
-          {/* Order Specifications */}
-          <div className="bg-white border border-blue-100/80 rounded-3xl p-6 shadow-xl shadow-blue-900/5 space-y-5">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3">
-              SPESIFIKASI ID CARD
-            </h3>
-
-            <div className="space-y-4" id="specs-list">
-              {order.clientName && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemesan</span>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
-                    <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                    <span>{order.clientName}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Universitas</span>
-                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
-                  <School className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span>{order.parsedData.kampus}</span>
-                </div>
-              </div>
-
-              {(order.parsedData.fakultas && order.parsedData.fakultas !== '-') && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fakultas</span>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
-                    <BookOpen className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                    <span>{order.parsedData.fakultas}</span>
-                  </div>
-                </div>
-              )}
-
-              {(order.parsedData.prodi && order.parsedData.prodi !== '-') && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Program Studi</span>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
-                    <GraduationCap className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                    <span>{order.parsedData.prodi}</span>
-                  </div>
-                </div>
-              )}
-
-              {(order.parsedData.sma && order.parsedData.sma !== '-') && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Asal SMA</span>
-                  <div className="text-xs text-slate-700 font-semibold">
-                    {order.parsedData.sma}
-                  </div>
-                </div>
-              )}
-
-              {(order.parsedData.jalur && order.parsedData.jalur !== '-') && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jalur Masuk</span>
-                  <div className="text-xs text-slate-700 font-semibold">
-                    {order.parsedData.jalur}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                {(order.parsedData.jenisUniv && order.parsedData.jenisUniv !== '-') && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipe Univ</span>
-                    <div className="text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded px-2 py-1 font-mono text-center font-semibold">
-                      {order.parsedData.jenisUniv}
-                    </div>
-                  </div>
-                )}
-
-                {(order.parsedData.jenisFak && order.parsedData.jenisFak !== '-') && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipe Fak</span>
-                    <div className="text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded px-2 py-1 font-mono text-center font-semibold">
-                      {order.parsedData.jenisFak}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {(order.parsedData.ig && order.parsedData.ig !== '-') && (
-                <div className="space-y-1 pt-2 border-t border-slate-50">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Username Instagram</span>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold">
-                    <Instagram className="w-4 h-4 text-slate-400" />
-                    <span className="font-mono text-blue-500">@{cleanIgUsername(order.parsedData.ig)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Billing Card */}
-          <div className="bg-white border border-blue-100/80 rounded-3xl p-6 shadow-xl shadow-blue-900/5 space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3">
-              RINCIAN PEMBAYARAN
-            </h3>
-
-            <div className="space-y-3 text-xs" id="billing-list">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">Status Pembayaran</span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded text-[10px]">
-                  Terverifikasi / Lunas
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">Total Nominal</span>
-                <span className="font-extrabold text-slate-700 text-sm">
-                  {formatCurrency(order.totalPrice)}
-                </span>
-              </div>
-
-              {order.finishedAt !== '-' && !isCancelled && (
-                <div className="flex items-center justify-between border-t border-slate-50 pt-3">
-                  <span className="text-slate-400 font-medium">Selesai Pada</span>
-                  <span className="font-semibold text-slate-600 font-sans text-right">
-                    {formatDateTime(order.finishedAt)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Verifikasi Desain & Spesifikasi Card */}
           <div className="bg-white border border-blue-100/80 rounded-3xl p-5 shadow-xl shadow-blue-900/5 space-y-3" id="verification-status-card">
@@ -573,6 +443,136 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                   </a>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Specifications & Billing Summary */}
+        <div className="space-y-6" id="detail-specs-col">
+          {/* Order Specifications */}
+          <div className="bg-white border border-blue-100/80 rounded-3xl p-6 shadow-xl shadow-blue-900/5 space-y-5">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3">
+              SPESIFIKASI ID CARD
+            </h3>
+
+            <div className="space-y-4" id="specs-list">
+              {order.clientName && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pemesan</span>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
+                    <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <span>{order.clientName}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Universitas</span>
+                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
+                  <School className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span>{order.parsedData.kampus}</span>
+                </div>
+              </div>
+
+              {(order.parsedData.fakultas && order.parsedData.fakultas !== '-') && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fakultas</span>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
+                    <BookOpen className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <span>{order.parsedData.fakultas}</span>
+                  </div>
+                </div>
+              )}
+
+              {(order.parsedData.prodi && order.parsedData.prodi !== '-') && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Program Studi</span>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
+                    <GraduationCap className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <span>{order.parsedData.prodi}</span>
+                  </div>
+                </div>
+              )}
+
+              {(order.parsedData.sma && order.parsedData.sma !== '-') && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Asal SMA</span>
+                  <div className="text-xs text-slate-700 font-semibold">
+                    {order.parsedData.sma}
+                  </div>
+                </div>
+              )}
+
+              {(order.parsedData.jalur && order.parsedData.jalur !== '-') && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jalur Masuk</span>
+                  <div className="text-xs text-slate-700 font-semibold">
+                    {order.parsedData.jalur}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                {(order.parsedData.jenisUniv && order.parsedData.jenisUniv !== '-') && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipe Univ</span>
+                    <div className="text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded px-2 py-1 font-mono text-center font-semibold">
+                      {order.parsedData.jenisUniv}
+                    </div>
+                  </div>
+                )}
+
+                {(order.parsedData.jenisFak && order.parsedData.jenisFak !== '-') && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipe Fak</span>
+                    <div className="text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded px-2 py-1 font-mono text-center font-semibold">
+                      {order.parsedData.jenisFak}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {(order.parsedData.ig && order.parsedData.ig !== '-') && (
+                <div className="space-y-1 pt-2 border-t border-slate-50">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Username Instagram</span>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold">
+                    <Instagram className="w-4 h-4 text-slate-400" />
+                    <span className="font-mono text-blue-500">@{cleanIgUsername(order.parsedData.ig)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Billing Card */}
+          <div className="bg-white border border-blue-100/80 rounded-3xl p-6 shadow-xl shadow-blue-900/5 space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-3">
+              RINCIAN PEMBAYARAN
+            </h3>
+
+            <div className="space-y-3 text-xs" id="billing-list">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">Status Pembayaran</span>
+                <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded text-[10px]">
+                  Terverifikasi / Lunas
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">Total Nominal</span>
+                <span className="font-extrabold text-slate-700 text-sm">
+                  {formatCurrency(order.totalPrice)}
+                </span>
+              </div>
+
+              {order.finishedAt !== '-' && !isCancelled && (
+                <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+                  <span className="text-slate-400 font-medium">Selesai Pada</span>
+                  <span className="font-semibold text-slate-600 font-sans text-right">
+                    {formatDateTime(order.finishedAt)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
