@@ -46,6 +46,14 @@ export function parseOrderData(raw: string): ParsedOrderData {
     jenisUniv: '-',
     jenisFak: '-',
     ig: '-',
+    warnaBendera: '-',
+    warnaTali: '-',
+    warnaBenderaUniv: '',
+    warnaBenderaFak: '',
+    warnaTaliUniv: '',
+    warnaTaliFak: '',
+    ukuranCaseUniv: '',
+    ukuranCaseFak: '',
   };
 
   if (!raw || raw.trim() === '') {
@@ -75,6 +83,22 @@ export function parseOrderData(raw: string): ParsedOrderData {
         result.jenisFak = value;
       } else if (key.includes('ig') || key.includes('instagram')) {
         result.ig = cleanIgUsername(value);
+      } else if (key.includes('bendera univ') || key.includes('bendera universitas')) {
+        result.warnaBenderaUniv = value;
+      } else if (key.includes('bendera fak') || key.includes('bendera fakultas')) {
+        result.warnaBenderaFak = value;
+      } else if (key.includes('tali univ') || key.includes('tali universitas')) {
+        result.warnaTaliUniv = value;
+      } else if (key.includes('tali fak') || key.includes('tali fakultas')) {
+        result.warnaTaliFak = value;
+      } else if (key.includes('ukuran case univ') || key.includes('case univ') || key.includes('ukuran holder univ')) {
+        result.ukuranCaseUniv = value;
+      } else if (key.includes('ukuran case fak') || key.includes('case fak') || key.includes('ukuran holder fak')) {
+        result.ukuranCaseFak = value;
+      } else if (key.includes('warna bendera') || key.includes('bendera')) {
+        result.warnaBendera = value;
+      } else if (key.includes('warna tali') || key.includes('tali')) {
+        result.warnaTali = value;
       }
     }
   });

@@ -93,7 +93,7 @@ export default function LandingPage({
             <button
               type="submit"
               disabled={!searchQuery.trim()}
-              className="absolute left-2.5 top-2.5 bottom-2.5 w-11 sm:w-28 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/10 active:scale-95 focus:outline-none flex items-center justify-center gap-1.5 cursor-pointer"
+              className="absolute left-2.5 top-2.5 bottom-2.5 w-11 sm:w-28 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-500/10 active:scale-95 focus:outline-none flex items-center justify-center gap-1.5 cursor-pointer"
               id="search-button-left"
               title="Cari"
             >

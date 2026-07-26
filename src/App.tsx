@@ -122,7 +122,15 @@ export default function App() {
           linkQr: o.LINK_QR || '',
           linkProject: o.LINK_PROJECT || '',
           statusQr: o.STATUS_QR || '',
-          statusProject: o.STATUS_PROJECT || ''
+          statusProject: o.STATUS_PROJECT || '',
+          warnaBendera: o.WARNA_BENDERA || '',
+          warnaTali: o.WARNA_TALI || '',
+          warnaBenderaUniv: o.WARNA_BENDERA_UNIV || '',
+          warnaBenderaFak: o.WARNA_BENDERA_FAK || '',
+          warnaTaliUniv: o.WARNA_TALI_UNIV || '',
+          warnaTaliFak: o.WARNA_TALI_FAK || '',
+          ukuranCaseUniv: o.UKURAN_CASE_UNIV || '',
+          ukuranCaseFak: o.UKURAN_CASE_FAK || ''
         }));
         
         setOrders(parsedOrders);
@@ -249,14 +257,19 @@ export default function App() {
         });
 
         const getCellByCol = (rObj: any, rawCells: any[], possibleKeys: string[], colIdx: number) => {
-          for (const k of Object.keys(rObj)) {
-            const normK = k.toUpperCase().replace(/[\s_]/g, '');
-            for (const pk of possibleKeys) {
-              if (normK === pk.toUpperCase().replace(/[\s_]/g, '')) {
-                return String(rObj[k] || '').trim();
+          const keys = Object.keys(rObj);
+          if (keys.length > 0) {
+            for (const k of keys) {
+              const normK = k.toUpperCase().replace(/[\s_]/g, '');
+              for (const pk of possibleKeys) {
+                if (normK === pk.toUpperCase().replace(/[\s_]/g, '')) {
+                  return String(rObj[k] ?? '').trim();
+                }
               }
             }
+            return "";
           }
+
           if (rawCells && rawCells[colIdx]) {
             const cell = rawCells[colIdx];
             if (cell && cell.v !== null && cell.v !== undefined) {
@@ -276,8 +289,8 @@ export default function App() {
           const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 8) || String(idx + 2);
           const clientName = (gformRow && rowToNameMap[gformRow]) || emailToNameMap[emailLower] || "";
 
-          const rawStatusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 12);
-          const rawStatusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 13);
+          const rawStatusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 11);
+          const rawStatusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 12);
           const rawStatusOrder = getCellByCol(rObj, rawCells, ["STATUS"], 3) || "DIPROSES";
           const contact = getCellByCol(rObj, rawCells, ["CONTACT"], 2);
           const totalPrice = getCellByCol(rObj, rawCells, ["TOTAL_PRICE"], 4) || "0";
@@ -286,7 +299,7 @@ export default function App() {
           const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
 
           const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "QR_LINK", "LINKQR"], 9);
-          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 11);
+          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 10);
 
           const cleanLink = (val: string) => {
             const s = String(val || "").trim();
@@ -294,6 +307,16 @@ export default function App() {
             if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
             return s;
           };
+
+          const rawWarnaBendera = getCellByCol(rObj, rawCells, ["WARNA_BENDERA", "WARNA BENDERA"], 13);
+          const rawWarnaTali = getCellByCol(rObj, rawCells, ["WARNA_TALI", "WARNA TALI"], 14);
+
+          const rawWarnaBenderaUniv = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_UNIV", "WARNA BENDERA UNIV", "BENDERA UNIV", "WARNA_BENDERA_UNIVERSITAS", "BENDERA UNIVERSITAS"], 15);
+          const rawWarnaBenderaFak = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_FAK", "WARNA BENDERA FAK", "BENDERA FAK", "WARNA_BENDERA_FAKULTAS", "BENDERA FAKULTAS"], 16);
+          const rawWarnaTaliUniv = getCellByCol(rObj, rawCells, ["WARNA_TALI_UNIV", "WARNA TALI UNIV", "TALI UNIV", "WARNA_TALI_UNIVERSITAS", "TALI UNIVERSITAS"], 17);
+          const rawWarnaTaliFak = getCellByCol(rObj, rawCells, ["WARNA_TALI_FAK", "WARNA TALI FAK", "TALI FAK", "WARNA_TALI_FAKULTAS", "TALI FAKULTAS"], 18);
+          const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
+          const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
 
           return {
             id: orderId,
@@ -310,7 +333,15 @@ export default function App() {
             linkQr: cleanLink(rawLinkQr),
             linkProject: cleanLink(rawLinkProject),
             statusQr: rawStatusQr || "",
-            statusProject: rawStatusProject || ""
+            statusProject: rawStatusProject || "",
+            warnaBendera: rawWarnaBendera,
+            warnaTali: rawWarnaTali,
+            warnaBenderaUniv: rawWarnaBenderaUniv,
+            warnaBenderaFak: rawWarnaBenderaFak,
+            warnaTaliUniv: rawWarnaTaliUniv,
+            warnaTaliFak: rawWarnaTaliFak,
+            ukuranCaseUniv: rawUkuranCaseUniv,
+            ukuranCaseFak: rawUkuranCaseFak
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         

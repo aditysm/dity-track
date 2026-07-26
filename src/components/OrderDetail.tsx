@@ -50,8 +50,9 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
     switch (status) {
       case 'DIPROSES': return 0;
       case 'DIKERJAKAN': return 1;
-      case 'SIAP DIAMBIL': return 2;
-      case 'SELESAI': return 3;
+      case 'DIBUAT': return 2;
+      case 'SIAP DIAMBIL': return 3;
+      case 'SELESAI': return 4;
       default: return -1;
     }
   };
@@ -78,6 +79,11 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
       statusKey: 'DIKERJAKAN'
     },
     {
+      title: 'Proses Pembuatan & Pemotongan',
+      desc: 'Desain telah dikunci dan sedang dalam produksi cetak ID Card serta proses pemotongan presisi.',
+      statusKey: 'DIBUAT'
+    },
+    {
       title: 'Siap Diambil',
       desc: 'Produksi cetak ID Card selesai dilakukan. Pesanan siap diambil atau dikirim.',
       statusKey: 'SIAP DIAMBIL'
@@ -90,8 +96,45 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
   ];
 
   const hasIg = !!(order.parsedData.ig && order.parsedData.ig !== '-');
-  const isDikerjakan = order.status === 'DIKERJAKAN';
+  const isDikerjakan = order.status === 'DIKERJAKAN' || order.status === 'DIBUAT';
   const showStickyBottom = isDikerjakan;
+
+  // Univ Card Specs
+  const benderaUnivVal = order.warnaBenderaUniv || order.parsedData?.warnaBenderaUniv || '';
+  const taliUnivVal = order.warnaTaliUniv || order.parsedData?.warnaTaliUniv || '';
+  const caseUnivVal = (order.ukuranCaseUniv && order.ukuranCaseUniv !== '-') 
+    ? order.ukuranCaseUniv 
+    : (order.parsedData?.ukuranCaseUniv && order.parsedData.ukuranCaseUniv !== '-')
+      ? order.parsedData.ukuranCaseUniv 
+      : 'B4';
+  const showUnivCard = (benderaUnivVal.trim() !== '' && benderaUnivVal.trim() !== '-') || 
+                       (taliUnivVal.trim() !== '' && taliUnivVal.trim() !== '-');
+
+  // Fak Card Specs
+  const benderaFakVal = order.warnaBenderaFak || order.parsedData?.warnaBenderaFak || '';
+  const taliFakVal = order.warnaTaliFak || order.parsedData?.warnaTaliFak || '';
+  const caseFakVal = (order.ukuranCaseFak && order.ukuranCaseFak !== '-') 
+    ? order.ukuranCaseFak 
+    : (order.parsedData?.ukuranCaseFak && order.parsedData.ukuranCaseFak !== '-')
+      ? order.parsedData.ukuranCaseFak 
+      : 'B2';
+  const showFakCard = (benderaFakVal.trim() !== '' && benderaFakVal.trim() !== '-') || 
+                      (taliFakVal.trim() !== '' && taliFakVal.trim() !== '-');
+
+  const hasBothCards = showUnivCard && showFakCard;
+
+  // Legacy fallback
+  const legacyBendera = (order.warnaBendera && order.warnaBendera !== '-')
+    ? order.warnaBendera
+    : (order.parsedData?.warnaBendera && order.parsedData.warnaBendera !== '-')
+      ? order.parsedData.warnaBendera
+      : '-';
+
+  const legacyTali = (order.warnaTali && order.warnaTali !== '-')
+    ? order.warnaTali
+    : (order.parsedData?.warnaTali && order.parsedData.warnaTali !== '-')
+      ? order.parsedData.warnaTali
+      : '-';
 
   const isProjectReady = !!order.linkProject;
   const isQrReady = !!order.linkQr;
@@ -113,7 +156,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
       }
       return 'Desainer sedang membuat & menyiapkan QR & ID Card Anda. Tombol akan aktif begitu file selesai dibuat.';
     } else {
-      return 'Desainer sedang membuat & menyiapkan ID Card Anda. Tombol akan aktif begitu file selesai dibuat.';
+      return 'Desainer sedang membuat & menyiapkan ID Card Anda. Tombol akan aktif begitu file selesai dibuat';
     }
   };
 
@@ -395,10 +438,10 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
             </div>
           </div>
 
-          {/* Verifikasi Desain Card */}
+          {/* Verifikasi Desain & Spesifikasi Card */}
           <div className="bg-white border border-blue-100/80 rounded-3xl p-5 shadow-xl shadow-blue-900/5 space-y-3" id="verification-status-card">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2.5">
-              {hasIg ? 'VERIFIKASI DESAIN & ID CARD' : 'VERIFIKASI HASIL ID CARD'}
+              PRATINJAU DESAIN & SPESIFIKASI
             </h3>
 
             <div className="space-y-2.5 text-xs">
@@ -415,8 +458,8 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                     title={!order.linkQr ? "QR Instagram sedang diproses oleh desainer" : "Lihat QR Saya"}
                     className={`w-38 justify-center font-bold px-3 py-1.5 rounded-lg text-[11px] transition-colors flex items-center gap-1.5 ${
                       order.linkQr 
-                        ? 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 cursor-pointer' 
-                        : 'text-slate-400 bg-slate-50 border border-slate-100 opacity-60 cursor-not-allowed'
+                        ? 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 cursor-pointer active:scale-95' 
+                        : 'text-slate-400 bg-slate-50 border border-slate-100 opacity-60 cursor-not-allowed disabled:cursor-not-allowed'
                     }`}
                   >
                     <Instagram className="w-3 h-3" />
@@ -425,32 +468,110 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                 </div>
               )}
 
-              {/* Hasil ID Card */}
-              <div className={`flex items-center justify-between ${hasIg ? 'border-t border-slate-50 pt-2.5' : ''}`}>
-                <span className="text-slate-600 font-medium flex items-center gap-1.5">
-                  <IdCard className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Hasil ID Card</span>
-                </span>
-                <button
-                  onClick={() => order.linkProject && setShowProjectPopup(true)}
-                  disabled={!order.linkProject}
-                  title={!order.linkProject ? "Desainer sedang membuat & menyiapkan ID Card Anda" : "Lihat ID Card Saya"}
-                  className={`w-38 justify-center font-bold px-3 py-1.5 rounded-lg text-[11px] transition-colors flex items-center gap-1.5 ${
-                    order.linkProject 
-                      ? 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 cursor-pointer' 
-                      : 'text-slate-400 bg-slate-50 border border-slate-100 opacity-60 cursor-not-allowed'
-                  }`}
-                >
-                  <IdCard className="w-3 h-3" />
-                  <span>Lihat ID Card Saya</span>
-                </button>
+              {/* Hasil ID Card & Sub-Spesifikasi */}
+              <div className={`space-y-2.5 ${hasIg ? 'border-t border-slate-50 pt-2.5' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 font-medium flex items-center gap-1.5">
+                    <IdCard className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Hasil ID Card</span>
+                  </span>
+                  <button
+                    onClick={() => order.linkProject && setShowProjectPopup(true)}
+                    disabled={!order.linkProject}
+                    title={!order.linkProject ? "Desainer sedang membuat & menyiapkan ID Card Anda" : "Lihat ID Card Saya"}
+                    className={`w-38 justify-center font-bold px-3 py-1.5 rounded-lg text-[11px] transition-colors flex items-center gap-1.5 ${
+                      order.linkProject 
+                        ? 'text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 cursor-pointer active:scale-95' 
+                        : 'text-slate-400 bg-slate-50 border border-slate-100 opacity-60 cursor-not-allowed disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    <IdCard className="w-3 h-3" />
+                    <span>Lihat ID Card Saya</span>
+                  </button>
+                </div>
+
+                {/* Sub Spesifikasi Per Card */}
+                <div className="ml-5 space-y-2 text-[11px]">
+                  {/* 1. ID Card Universitas */}
+                  {showUnivCard && (
+                    <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100/80 space-y-1.5">
+                      <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        <span>{hasBothCards ? "1. ID Card Universitas" : "ID Card Universitas"}</span>
+                      </div>
+                      <div className="pl-3 space-y-1 text-slate-600">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Warna Bendera:</span>
+                          <span className="font-semibold text-slate-700">{benderaUnivVal || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Warna Tali:</span>
+                          <span className="font-semibold text-slate-700">{taliUnivVal || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Ukuran Holder:</span>
+                          <span className="font-semibold text-slate-700">{caseUnivVal}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. ID Card Fakultas */}
+                  {showFakCard && (
+                    <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100/80 space-y-1.5">
+                      <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        <span>{hasBothCards ? "2. ID Card Fakultas" : "ID Card Fakultas"}</span>
+                      </div>
+                      <div className="pl-3 space-y-1 text-slate-600">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Warna Bendera:</span>
+                          <span className="font-semibold text-slate-700">{benderaFakVal || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Warna Tali:</span>
+                          <span className="font-semibold text-slate-700">{taliFakVal || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Ukuran Holder:</span>
+                          <span className="font-semibold text-slate-700">{caseFakVal}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback if legacy single card */}
+                  {!showUnivCard && !showFakCard && (
+                    <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100/80 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Warna Bendera:</span>
+                        <span className="font-semibold text-slate-700">{legacyBendera}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Warna Tali:</span>
+                        <span className="font-semibold text-slate-700">{legacyTali}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Info Note */}
-              <div className="border-t border-slate-50 pt-2.5">
-                <p className="text-[11px] leading-relaxed text-slate-500">
+              <div className="border-t border-slate-50 pt-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] leading-relaxed text-slate-500">
+                <p className="flex-1">
                   {getVerificationHelpText()}
                 </p>
+                <div className="shrink-0 font-medium pt-1 sm:pt-0">
+                  <span>Ada yang berbeda? </span>
+                  <a
+                    href={`https://wa.me/${supportWaNumber}?text=${encodeURIComponent(`Halo Admin Dity Store, saya ingin mengajukan request penggantian/perubahan data atau spesifikasi pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*). Mohon bantuannya.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700 font-bold underline underline-offset-2 transition-colors inline-flex items-center gap-0.5"
+                  >
+                    Request penggantian
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -462,7 +583,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
         <div className="hidden sm:flex fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 py-3.5 px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-40 items-center justify-between gap-4 animate-slide-up">
           <div className="flex flex-col text-left min-w-0">
             <span className="text-xs font-bold text-blue-600 uppercase tracking-wider font-mono">
-              {hasIg ? 'Verifikasi QR & Hasil ID Card' : 'Verifikasi Hasil ID Card'}
+              Pratinjau Desain & Spesifikasi
             </span>
             <span className="text-xs text-slate-500 font-sans mt-0.5 leading-tight">
               {getVerificationHelpText()}
@@ -478,7 +599,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                 className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
                   order.linkQr 
                     ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-xs shadow-blue-500/15 cursor-pointer active:scale-95' 
-                    : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed border border-slate-200/50'
+                    : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed disabled:cursor-not-allowed border border-slate-200/50'
                 }`}
               >
                 <Instagram className="w-3.5 h-3.5" />
@@ -493,7 +614,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
               className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
                 order.linkProject 
                   ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-600/15 cursor-pointer active:scale-95' 
-                  : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed border border-slate-200/50'
+                  : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed disabled:cursor-not-allowed border border-slate-200/50'
               }`}
             >
               <IdCard className="w-3.5 h-3.5" />

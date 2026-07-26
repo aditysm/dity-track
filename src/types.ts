@@ -1,4 +1,4 @@
-export type OrderStatus = 'DIPROSES' | 'DIKERJAKAN' | 'SIAP DIAMBIL' | 'SELESAI' | 'DIBATALKAN';
+export type OrderStatus = 'DIPROSES' | 'DIKERJAKAN' | 'DIBUAT' | 'SIAP DIAMBIL' | 'SELESAI' | 'DIBATALKAN';
 
 export interface ParsedOrderData {
   kampus: string;
@@ -9,6 +9,14 @@ export interface ParsedOrderData {
   jenisUniv: string;
   jenisFak: string;
   ig: string;
+  warnaBendera?: string;
+  warnaTali?: string;
+  warnaBenderaUniv?: string;
+  warnaBenderaFak?: string;
+  warnaTaliUniv?: string;
+  warnaTaliFak?: string;
+  ukuranCaseUniv?: string;
+  ukuranCaseFak?: string;
 }
 
 export interface Order {
@@ -27,4 +35,12 @@ export interface Order {
   linkProject?: string;  // LINK_PROJECT
   statusQr?: string;     // STATUS_QR
   statusProject?: string; // STATUS_PROJECT
+  warnaBendera?: string; // WARNA_BENDERA
+  warnaTali?: string;    // WARNA_TALI
+  warnaBenderaUniv?: string; // WARNA_BENDERA_UNIV
+  warnaBenderaFak?: string;  // WARNA_BENDERA_FAK
+  warnaTaliUniv?: string;    // WARNA_TALI_UNIV
+  warnaTaliFak?: string;     // WARNA_TALI_FAK
+  ukuranCaseUniv?: string;   // UKURAN_CASE_UNIV
+  ukuranCaseFak?: string;    // UKURAN_CASE_FAK
 }

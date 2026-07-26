@@ -72,6 +72,11 @@ export default function SearchResults({ query, results, onBack, onSelectOrder, o
           bg: 'bg-blue-50 text-blue-700 border-blue-200',
           label: 'Sedang Dikerjakan'
         };
+      case 'DIBUAT':
+        return {
+          bg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+          label: 'Pembuatan & Pemotongan'
+        };
       case 'SIAP DIAMBIL':
         return {
           bg: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -108,7 +113,7 @@ export default function SearchResults({ query, results, onBack, onSelectOrder, o
             <button
               type="submit"
               disabled={!searchQuery.trim()}
-              className="absolute left-1.5 top-1.5 bottom-1.5 w-9 sm:w-24 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 text-white font-bold text-[11px] rounded-lg transition-all active:scale-95 focus:outline-none flex items-center justify-center gap-1.5 cursor-pointer"
+              className="absolute left-1.5 top-1.5 bottom-1.5 w-9 sm:w-24 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-200 disabled:cursor-not-allowed disabled:active:scale-100 text-white font-bold text-[11px] rounded-lg transition-all active:scale-95 focus:outline-none flex items-center justify-center gap-1.5 cursor-pointer"
               id="results-search-button-left"
               title="Cari"
             >
