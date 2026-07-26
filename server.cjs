@@ -38,12 +38,20 @@ var MOCK_ORDERS = [
     TOTAL_PRICE: "75000",
     CREATED_AT: "2026-07-20 08:30:00",
     FINISHED_AT: "-",
-    ORDER_DATA: "Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra",
+    ORDER_DATA: "Kampus: Universitas Diponegoro | Fakultas: Teknik | Prodi: Sistem Komputer | SMA: SMAN 1 Semarang | Jalur: SNBP | Jenis Univ: Reguler | Jenis Fak: Premium | IG: @adityptra | Warna Bendera: Merah Putih | Warna Tali: Hitam",
     GFORM_ROW: "2",
     LINK_QR: "https://drive.google.com/file/d/1t_W-m63tV1_z-XmO5V_zJg-YmX6f_S_Z/view?usp=sharing",
     LINK_PROJECT: "https://github.com/adityptra212/dity-track",
     STATUS_QR: "",
-    STATUS_PROJECT: ""
+    STATUS_PROJECT: "",
+    WARNA_BENDERA: "Merah Putih",
+    WARNA_TALI: "Hitam",
+    WARNA_BENDERA_UNIV: "Merah Putih",
+    WARNA_BENDERA_FAK: "",
+    WARNA_TALI_UNIV: "Hitam",
+    WARNA_TALI_FAK: "",
+    UKURAN_CASE_UNIV: "B4",
+    UKURAN_CASE_FAK: ""
   },
   {
     ORDER_ID: "INV-20260719-02",
@@ -208,14 +216,17 @@ app.get("/api/orders", async (req, res) => {
       return rowObj;
     });
     const getCellByCol = (rObj, rawCells, possibleKeys, colIdx) => {
-      for (const k of Object.keys(rObj)) {
-        const normK = k.toUpperCase().replace(/[\s_]/g, "");
-        for (const pk of possibleKeys) {
-          if (normK === pk.toUpperCase().replace(/[\s_]/g, "")) {
-            const val = String(rObj[k] || "").trim();
-            if (val) return val;
+      const keys = Object.keys(rObj);
+      if (keys.length > 0) {
+        for (const k of keys) {
+          const normK = k.toUpperCase().replace(/[\s_]/g, "");
+          for (const pk of possibleKeys) {
+            if (normK === pk.toUpperCase().replace(/[\s_]/g, "")) {
+              return String(rObj[k] ?? "").trim();
+            }
           }
         }
+        return "";
       }
       if (rawCells && rawCells[colIdx]) {
         const cell = rawCells[colIdx];
@@ -231,7 +242,7 @@ app.get("/api/orders", async (req, res) => {
       const orderId = getCellByCol(rObj, rawCells, ["ORDER_ID", "ID", "INVOICE"], 0) || String(rObj.ORDER_ID || "");
       const clientId = getCellByCol(rObj, rawCells, ["CLIENT_ID", "EMAIL"], 1) || String(rObj.CLIENT_ID || "");
       const emailLower = clientId.trim().toLowerCase();
-      const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 16) || String(idx + 2);
+      const gformRow = getCellByCol(rObj, rawCells, ["GFORM_ROW", "ROW"], 8) || String(idx + 2);
       const clientName = gformRow && rowToNameMap[gformRow] || emailToNameMap[emailLower] || "";
       const cleanLink = (val) => {
         if (!val) return "";
@@ -243,17 +254,25 @@ app.get("/api/orders", async (req, res) => {
         return s;
       };
       const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "QR_LINK", "LINKQR"], 9);
-      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 11);
+      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 10);
       const linkQr = cleanLink(rawLinkQr);
       const linkProject = cleanLink(rawLinkProject);
       const statusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 11);
-      const statusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 13);
+      const statusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 12);
       const statusOrder = getCellByCol(rObj, rawCells, ["STATUS"], 3) || "DIPROSES";
       const contact = getCellByCol(rObj, rawCells, ["CONTACT"], 2);
       const totalPrice = getCellByCol(rObj, rawCells, ["TOTAL_PRICE"], 4) || "0";
       const createdAt = getCellByCol(rObj, rawCells, ["CREATED_AT"], 5);
       const finishedAt = getCellByCol(rObj, rawCells, ["FINISHED_AT"], 6) || "-";
       const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
+      const rawWarnaBendera = getCellByCol(rObj, rawCells, ["WARNA_BENDERA", "WARNA BENDERA"], 13);
+      const rawWarnaTali = getCellByCol(rObj, rawCells, ["WARNA_TALI", "WARNA TALI"], 14);
+      const rawWarnaBenderaUniv = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_UNIV", "WARNA BENDERA UNIV", "BENDERA UNIV", "WARNA_BENDERA_UNIVERSITAS", "BENDERA UNIVERSITAS"], 15);
+      const rawWarnaBenderaFak = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_FAK", "WARNA BENDERA FAK", "BENDERA FAK", "WARNA_BENDERA_FAKULTAS", "BENDERA FAKULTAS"], 16);
+      const rawWarnaTaliUniv = getCellByCol(rObj, rawCells, ["WARNA_TALI_UNIV", "WARNA TALI UNIV", "TALI UNIV", "WARNA_TALI_UNIVERSITAS", "TALI UNIVERSITAS"], 17);
+      const rawWarnaTaliFak = getCellByCol(rObj, rawCells, ["WARNA_TALI_FAK", "WARNA TALI FAK", "TALI FAK", "WARNA_TALI_FAKULTAS", "TALI FAKULTAS"], 18);
+      const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
+      const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
       return {
         ORDER_ID: orderId,
         CLIENT_ID: clientId,
@@ -268,7 +287,15 @@ app.get("/api/orders", async (req, res) => {
         LINK_QR: linkQr,
         LINK_PROJECT: linkProject,
         STATUS_QR: statusQr,
-        STATUS_PROJECT: statusProject
+        STATUS_PROJECT: statusProject,
+        WARNA_BENDERA: rawWarnaBendera,
+        WARNA_TALI: rawWarnaTali,
+        WARNA_BENDERA_UNIV: rawWarnaBenderaUniv,
+        WARNA_BENDERA_FAK: rawWarnaBenderaFak,
+        WARNA_TALI_UNIV: rawWarnaTaliUniv,
+        WARNA_TALI_FAK: rawWarnaTaliFak,
+        UKURAN_CASE_UNIV: rawUkuranCaseUniv,
+        UKURAN_CASE_FAK: rawUkuranCaseFak
       };
     }).filter((order) => order.ORDER_ID !== "" && order.ORDER_ID !== "ORDER_ID");
     return res.json({
