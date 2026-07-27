@@ -43,4 +43,5 @@ export interface Order {
   warnaTaliFak?: string;     // WARNA_TALI_FAK
   ukuranCaseUniv?: string;   // UKURAN_CASE_UNIV
   ukuranCaseFak?: string;    // UKURAN_CASE_FAK
+  bisaRefund?: boolean;      // BISA_REFUND
 }

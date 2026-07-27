@@ -6,6 +6,8 @@ import { parseOrderData } from './utils';
 import LandingPage from './components/LandingPage';
 import SearchResults from './components/SearchResults';
 import OrderDetail from './components/OrderDetail';
+import PolicyPage from './components/PolicyPage';
+import PrivacyPage from './components/PrivacyPage';
 
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
@@ -130,7 +132,8 @@ export default function App() {
           warnaTaliUniv: o.WARNA_TALI_UNIV || '',
           warnaTaliFak: o.WARNA_TALI_FAK || '',
           ukuranCaseUniv: o.UKURAN_CASE_UNIV || '',
-          ukuranCaseFak: o.UKURAN_CASE_FAK || ''
+          ukuranCaseFak: o.UKURAN_CASE_FAK || '',
+          bisaRefund: !!o.BISA_REFUND
         }));
         
         setOrders(parsedOrders);
@@ -318,6 +321,11 @@ export default function App() {
           const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
           const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
 
+          const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 21);
+          const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || 
+                             String(rawBisaRefund || "").trim().toUpperCase() === "YA" || 
+                             String(rawBisaRefund || "").trim() === "1";
+
           return {
             id: orderId,
             clientId: clientId,
@@ -341,7 +349,8 @@ export default function App() {
             warnaTaliUniv: rawWarnaTaliUniv,
             warnaTaliFak: rawWarnaTaliFak,
             ukuranCaseUniv: rawUkuranCaseUniv,
-            ukuranCaseFak: rawUkuranCaseFak
+            ukuranCaseFak: rawUkuranCaseFak,
+            bisaRefund: bisaRefund
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         
@@ -593,10 +602,15 @@ export default function App() {
 
   // Determine active view based on routing pathname
   const activeView = useMemo(() => {
+    const searchParams = new URLSearchParams(search);
+    const pageParam = searchParams.get('page');
+
+    if (pathname === '/policy' || pageParam === 'policy') return 'POLICY';
+    if (pathname === '/privacy' || pageParam === 'privacy') return 'PRIVACY';
     if (pathname === '/hasil') return 'RESULTS';
     if (pathname === '/detail') return 'DETAIL';
     return 'LANDING';
-  }, [pathname]);
+  }, [pathname, search]);
 
   // Scroll to top instantly on page/view transition
   useEffect(() => {
@@ -752,13 +766,60 @@ export default function App() {
                 )}
               </motion.div>
             )}
+            {activeView === 'POLICY' && (
+              <motion.div
+                key="policy"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                <PolicyPage 
+                  onBack={handleBackToLanding} 
+                  onNavigatePrivacy={() => navigate('/privacy')} 
+                />
+              </motion.div>
+            )}
+            {activeView === 'PRIVACY' && (
+              <motion.div
+                key="privacy"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                <PrivacyPage 
+                  onBack={handleBackToLanding} 
+                  onNavigatePolicy={() => navigate('/policy')} 
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         )}
       </main>
 
-      {/* Simple, Professional, Centered Footer */}
-      <footer className="w-full border-t border-blue-50 bg-white/50 py-6 px-10 flex items-center justify-center text-[11px] text-slate-400 mt-12" id="app-footer">
-        <p id="footer-copyright">&copy; 2026 Dity Track - Powered by Dity Store</p>
+      {/* Footer */}
+      <footer className={`w-full border-t border-blue-50/80 bg-white/50 py-6 px-4 flex flex-col items-center justify-center gap-1.5 text-center text-xs text-slate-400 mt-12 max-w-4xl mx-auto ${activeView === 'DETAIL' ? 'pb-24 md:pb-28' : ''}`} id="app-footer">
+        <p className="text-[11px] text-slate-400 font-sans" id="footer-copyright">
+          &copy; 2026 Dity Track - Powered by Dity Store
+        </p>
+        <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 font-sans">
+          <button
+            onClick={() => navigate('/policy')}
+            className="hover:underline hover:text-slate-600 transition-colors cursor-pointer"
+            id="link-footer-policy"
+          >
+            Syarat &amp; Ketentuan
+          </button>
+          <span>&bull;</span>
+          <button
+            onClick={() => navigate('/privacy')}
+            className="hover:underline hover:text-slate-600 transition-colors cursor-pointer"
+            id="link-footer-privacy"
+          >
+            Kebijakan Privasi
+          </button>
+        </div>
       </footer>
 
       {/* Integration Setup Modal */}

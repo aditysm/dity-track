@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername } from '../utils';
@@ -27,6 +27,9 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
   const [copied, setCopied] = useState(false);
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundTermsAccepted, setRefundTermsAccepted] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
 
   // Helper to parse Google Drive URLs for direct rendering
   const getGoogleDrivePreviewUrl = (url: string) => {
@@ -140,6 +143,13 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
   const isQrReady = !!order.linkQr;
   const isAllReady = isProjectReady && (!hasIg || isQrReady);
 
+  const itemDescription = (() => {
+    if (showUnivCard && showFakCard) return '2x ID Card (Universitas & Fakultas)';
+    if (showUnivCard) return '1x ID Card Universitas';
+    if (showFakCard) return '1x ID Card Fakultas';
+    return '1x ID Card Fakultas';
+  })();
+
   const getVerificationHelpText = () => {
     if (isAllReady) {
       return hasIg
@@ -165,15 +175,17 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
       className={`w-full max-w-4xl mx-auto px-4 py-6 space-y-8 ${showStickyBottom ? 'pb-8 sm:pb-28' : ''}`}
       id="detail-container"
     >
-      {/* Back to Results */}
-      <button
-        onClick={onBack}
-        className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors group cursor-pointer"
-        id="btn-back-results"
-      >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-        <span>Kembali ke Hasil Pencarian</span>
-      </button>
+      {/* Navigation Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap" id="detail-nav-header">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors group cursor-pointer"
+          id="btn-back-results"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+          <span>Kembali ke Hasil Pencarian</span>
+        </button>
+      </div>
 
       {/* Profile Header */}
       <div 
@@ -573,6 +585,21 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                   </span>
                 </div>
               )}
+
+              {order.bisaRefund && (
+                <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-2 text-[11px] leading-relaxed text-slate-500">
+                  <div>
+                    <span className="font-medium text-slate-600">Berubah pikiran? </span>
+                    <button
+                      onClick={() => setShowRefundModal(true)}
+                      className="text-rose-600 hover:text-rose-700 hover:underline font-bold transition-colors cursor-pointer"
+                      id="btn-request-refund"
+                    >
+                      Request pengembalian dana
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -745,6 +772,178 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                   Laporkan kesalahan
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 3: AJUKAN PENGEMBALIAN DANA (REFUND) */}
+      {showRefundModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" id="modal-refund">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-5 animate-scale-up max-h-[90vh] overflow-y-auto">
+            <button 
+              onClick={() => {
+                setShowRefundModal(false);
+                setRefundTermsAccepted(false);
+                setRefundReason('');
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-all cursor-pointer"
+              id="btn-close-refund-modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-800 font-display">Pengajuan Pengembalian Dana</h3>
+              <p className="text-xs text-slate-500">Periksa rincian pesanan sebelum pengembalian dana Anda.</p>
+            </div>
+
+            {/* Order Details */}
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2.5 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium">No. Invoice</span>
+                <span className="font-bold font-mono text-slate-800">{order.id}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium">Pemesan</span>
+                <span className="font-bold text-slate-800">{order.clientName || order.clientId}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium">Deskripsi Pesanan</span>
+                <span className="font-bold text-slate-800">{itemDescription}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium">Total Dibayar</span>
+                <span className="font-extrabold text-slate-800">{formatCurrency(order.totalPrice)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Status Pesanan</span>
+                <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
+                  order.status === 'DIPROSES' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                  order.status === 'DIBUAT' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                  order.status === 'DIKERJAKAN' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                  'bg-slate-100 text-slate-700 border border-slate-200'
+                }`}>
+                  {order.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Refund Reason */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Alasan Pengajuan Pengembalian Dana <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Klik rekomendasi atau ketik manual</span>
+              </div>
+
+              {/* Quick suggestion tags */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Salah isi data / typo pada pesanan',
+                  'Ingin ganti varian / paket ID Card',
+                  'Batal memesan / berubah pikiran',
+                  'Kendala pembayaran / transfer ganda'
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => setRefundReason(suggestion)}
+                    className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                      refundReason === suggestion
+                        ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100 font-medium'
+                    }`}
+                  >
+                    + {suggestion}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="Tuliskan alasan pengembalian dana atau pilih rekomendasi di atas..."
+                rows={3}
+                required
+                className="w-full p-3 border border-slate-200 rounded-xl text-xs text-slate-700 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none resize-none"
+                id="input-refund-reason"
+              />
+            </div>
+
+            {/* Checkbox Agreement */}
+            <div className="pt-1">
+              <label className="flex items-start gap-2.5 cursor-pointer group text-xs text-slate-600 leading-relaxed" id="label-refund-terms">
+                <input
+                  type="checkbox"
+                  checked={refundTermsAccepted}
+                  onChange={(e) => setRefundTermsAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer flex-shrink-0"
+                  id="chk-refund-terms"
+                />
+                <span>
+                  Dengan menceklis, maka saya telah menyetujui{' '}
+                  <a
+                    href="/policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-rose-600 hover:text-rose-700 underline underline-offset-2 decoration-rose-500"
+                    id="link-refund-policy"
+                  >
+                    Syarat &amp; Ketentuan
+                  </a>{' '}
+                  dalam mengembalikan dana untuk pesanan di Dity Store.
+                </span>
+              </label>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 space-y-2">
+              {(() => {
+                const isFormValid = refundTermsAccepted && refundReason.trim().length > 0;
+                const waMessage = 
+                  `Halo Admin Dity Store, saya ingin mengajukan Pengembalian Dana (Refund) untuk pesanan berikut:\n\n` +
+                  `- No. Invoice: ${order.id}\n` +
+                  `- Pemesan: ${order.clientName || order.clientId}\n` +
+                  `- Deskripsi Pesanan: ${itemDescription}\n` +
+                  `- Total Dibayar: ${formatCurrency(order.totalPrice)}\n` +
+                  `- Status Pesanan: ${order.status}\n` +
+                  `- Alasan: Permintaan pembatalan / pengembalian dana: ${refundReason.trim()}`;
+
+                return (
+                  <a
+                    href={isFormValid ? `https://wa.me/62895634048237?text=${encodeURIComponent(waMessage)}` : undefined}
+                    target={isFormValid ? "_blank" : undefined}
+                    rel={isFormValid ? "noopener noreferrer" : undefined}
+                    onClick={(e) => {
+                      if (!isFormValid) {
+                        e.preventDefault();
+                        return;
+                      }
+                      setShowRefundModal(false);
+                    }}
+                    className={`w-full py-3 px-4 font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-center ${
+                      isFormValid
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20 active:scale-98 cursor-pointer'
+                        : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed border border-slate-200/50 shadow-none'
+                    }`}
+                    id="btn-submit-refund"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                    <span>Ajukan Pengembalian Dana</span>
+                  </a>
+                );
+              })()}
+
+              <button
+                type="button"
+                onClick={() => setShowRefundModal(false)}
+                className="w-full py-2 text-slate-400 hover:text-slate-600 font-medium text-xs text-center cursor-pointer"
+                id="btn-cancel-refund"
+              >
+                Batal
+              </button>
             </div>
           </div>
         </div>
