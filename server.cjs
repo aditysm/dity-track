@@ -51,7 +51,8 @@ var MOCK_ORDERS = [
     WARNA_TALI_UNIV: "Hitam",
     WARNA_TALI_FAK: "",
     UKURAN_CASE_UNIV: "B4",
-    UKURAN_CASE_FAK: ""
+    UKURAN_CASE_FAK: "",
+    BISA_REFUND: true
   },
   {
     ORDER_ID: "INV-20260719-02",
@@ -66,7 +67,8 @@ var MOCK_ORDERS = [
     LINK_QR: "https://drive.google.com/file/d/1t_W-m63tV1_z-XmO5V_zJg-YmX6f_S_Z/view?usp=sharing",
     LINK_PROJECT: "https://github.com/adityptra212/dity-track",
     STATUS_QR: "",
-    STATUS_PROJECT: ""
+    STATUS_PROJECT: "",
+    BISA_REFUND: true
   },
   {
     ORDER_ID: "INV-20260718-03",
@@ -273,6 +275,8 @@ app.get("/api/orders", async (req, res) => {
       const rawWarnaTaliFak = getCellByCol(rObj, rawCells, ["WARNA_TALI_FAK", "WARNA TALI FAK", "TALI FAK", "WARNA_TALI_FAKULTAS", "TALI FAKULTAS"], 18);
       const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
       const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
+      const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 21);
+      const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || String(rawBisaRefund || "").trim().toUpperCase() === "YA" || String(rawBisaRefund || "").trim() === "1";
       return {
         ORDER_ID: orderId,
         CLIENT_ID: clientId,
@@ -295,7 +299,8 @@ app.get("/api/orders", async (req, res) => {
         WARNA_TALI_UNIV: rawWarnaTaliUniv,
         WARNA_TALI_FAK: rawWarnaTaliFak,
         UKURAN_CASE_UNIV: rawUkuranCaseUniv,
-        UKURAN_CASE_FAK: rawUkuranCaseFak
+        UKURAN_CASE_FAK: rawUkuranCaseFak,
+        BISA_REFUND: bisaRefund
       };
     }).filter((order) => order.ORDER_ID !== "" && order.ORDER_ID !== "ORDER_ID");
     return res.json({
