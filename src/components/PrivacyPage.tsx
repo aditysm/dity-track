@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowLeft, ShieldCheck, FileText, ExternalLink, Phone, Instagram, Lock, UserCheck } from 'lucide-react';
 
 interface PrivacyPageProps {
@@ -7,6 +7,19 @@ interface PrivacyPageProps {
 }
 
 export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPageProps) {
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const elementId = hash.replace(/^#/, '');
+      const el = document.getElementById(elementId);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, []);
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-6 md:py-10 space-y-6" id="privacy-page">
       {/* Back Navigation Button */}
@@ -52,7 +65,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
         {/* Document Sections */}
         <div className="space-y-8 text-xs md:text-sm text-slate-700 leading-relaxed">
           {/* Section 1 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="pengumpulan-data">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               1. INFORMASI & DATA YANG KAMI KUMPULKAN
             </h2>
@@ -101,7 +114,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
           </section>
 
           {/* Section 2 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="tujuan-data">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               2. TUJUAN PENGGUNAAN DATA PRIBADI
             </h2>
@@ -117,7 +130,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
           </section>
 
           {/* Section 3 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="kerahasiaan-data">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               3. KERAHASIAAN & PERLINDUNGAN DATA
             </h2>
@@ -134,7 +147,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
           </section>
 
           {/* Section 4 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="pihak-ketiga">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               4. PENGGUNAAN LAYANAN PIHAK KETIGA
             </h2>
@@ -148,7 +161,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
           </section>
 
           {/* Section 5 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="hak-pemesan">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               5. HAK PEMESAN TERHADAP DATA PRIBADI
             </h2>
@@ -162,7 +175,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
           </section>
 
           {/* Section 6 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="pembaruan-kebijakan">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               6. PEMBARUAN KEBIJAKAN PRIVASI
             </h2>
@@ -172,7 +185,7 @@ export default function PrivacyPage({ onBack, onNavigatePolicy }: PrivacyPagePro
           </section>
 
           {/* Section 7 */}
-          <section className="space-y-4 pt-4 border-t border-slate-100">
+          <section className="space-y-4 pt-4 border-t border-slate-100" id="kontak">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
               7. HUBUNGI KAMI
             </h2>

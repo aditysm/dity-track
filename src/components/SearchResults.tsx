@@ -9,9 +9,10 @@ interface SearchResultsProps {
   onBack: () => void;
   onSelectOrder: (order: Order) => void;
   onSearch: (query: string) => void;
+  onShowToast?: (message: string) => void;
 }
 
-export default function SearchResults({ query, results, onBack, onSelectOrder, onSearch }: SearchResultsProps) {
+export default function SearchResults({ query, results, onBack, onSelectOrder, onSearch, onShowToast }: SearchResultsProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(query);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +37,7 @@ export default function SearchResults({ query, results, onBack, onSelectOrder, o
     e.stopPropagation();
     navigator.clipboard.writeText(id);
     setCopiedId(id);
+    onShowToast?.("Berhasil disalin ke papan klip!");
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -216,6 +218,7 @@ export default function SearchResults({ query, results, onBack, onSelectOrder, o
                           <Copy className="w-3.5 h-3.5" />
                         )}
                       </button>
+
 
                       {/* Selected product detail label */}
                       <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/20">

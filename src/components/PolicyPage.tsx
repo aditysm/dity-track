@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowLeft, ShieldCheck, FileText, ExternalLink, Phone, Instagram } from 'lucide-react';
 
 interface PolicyPageProps {
@@ -7,6 +7,19 @@ interface PolicyPageProps {
 }
 
 export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProps) {
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const elementId = hash.replace(/^#/, '');
+      const el = document.getElementById(elementId);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, []);
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-6 md:py-10 space-y-6" id="policy-page">
       {/* Back Navigation Button */}
@@ -52,7 +65,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
         {/* Document Sections */}
         <div className="space-y-8 text-xs md:text-sm text-slate-700 leading-relaxed">
           {/* Section 1 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="ketentuan">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               1. KETENTUAN UMUM & CATATAN KHUSUS
             </h2>
@@ -74,7 +87,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 2 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="akurasi">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               2. PEMESANAN, AKURASI DATA, & VERIFIKASI (PROOFREADING)
             </h2>
@@ -101,7 +114,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 3 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="pembayaran">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               3. PEMBAYARAN & HARGA
             </h2>
@@ -113,7 +126,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 4 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="spesifikasi">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               4. SPESIFIKASI PRODUKSI & TOLERANSI
             </h2>
@@ -139,7 +152,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 5 */}
-          <section className="space-y-4">
+          <section className="space-y-4" id="refund">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               5. KEBIJAKAN PEMBATALAN & PENGEMBALIAN DANA (REFUND)
             </h2>
@@ -170,7 +183,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
                   </tr>
                   <tr className="hover:bg-slate-50 transition-colors">
                     <td className="p-3 font-bold text-orange-600 font-mono">DIKERJAKAN</td>
-                    <td className="p-3 text-center font-extrabold text-orange-600 bg-orange-50/50">15%</td>
+                    <td className="p-3 text-center font-extrabold text-orange-600 bg-orange-50/50">85%</td>
                     <td className="p-3 text-slate-600">Pesanan sudah masuk tahap antrean pencetakan fisik/persiapan bahan baku.</td>
                   </tr>
                   <tr className="hover:bg-slate-50 transition-colors">
@@ -183,7 +196,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
             </div>
 
             <div className="space-y-1.5 text-xs text-slate-600 pt-1">
-              <p className="font-bold text-slate-800">Catatan Tamabahan:</p>
+              <p className="font-bold text-slate-800">Catatan Tambahan:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Jika pembatalan terjadi akibat kendala internal dari pihak Dity Store (misalnya stok bahan habis total dan tidak dapat dipenuhi), pengembalian dana diberikan sebesar 100%.</li>
                 <li>Proses pengembalian dana dilakukan melalui transfer bank atau e-wallet dalam waktu 1-3 hari kerja.</li>
@@ -192,7 +205,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 6 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="garansi">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               6. KETENTUAN GARANSI & KLAIM CACAT PRODUKSI
             </h2>
@@ -225,7 +238,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 7 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="pengiriman">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               7. PENGAMBILAN & PENGIRIMAN
             </h2>
@@ -246,7 +259,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 8 */}
-          <section className="space-y-3">
+          <section className="space-y-3" id="haki">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               8. HAK KEKAYAAN INTELEKTUAL & KERAHASIAAN DATA
             </h2>
@@ -257,7 +270,7 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
           </section>
 
           {/* Section 9 */}
-          <section className="space-y-4 pt-4 border-t border-slate-100">
+          <section className="space-y-4 pt-4 border-t border-slate-100" id="kontak">
             <h2 className="text-sm md:text-base font-bold text-slate-900 font-display flex items-center gap-2 border-l-4 border-blue-500 pl-3">
               9. HUBUNGI KAMI
             </h2>

@@ -12,6 +12,7 @@ import PrivacyPage from './components/PrivacyPage';
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
   const [search, setSearch] = useState(window.location.search);
+  const [hash, setHash] = useState(window.location.hash);
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,14 +86,19 @@ export default function App() {
     setSearch(searchStr ? '?' + searchStr : '');
   };
 
-  // Sync route on popstate (back/forward browser buttons)
+  // Sync route on popstate and hashchange (back/forward browser buttons and hash links)
   useEffect(() => {
     const handlePopState = () => {
       setPathname(window.location.pathname);
       setSearch(window.location.search);
+      setHash(window.location.hash);
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
   }, []);
 
   // Fetch orders from our server-side API with direct client-side fallback
@@ -596,25 +602,43 @@ export default function App() {
     }
   };
 
+  const showToast = (message: string, type: 'success' | 'warning' | 'error' = 'success') => {
+    setToast({ type, message });
+  };
+
   const handleSelectSample = (id: string) => {
     handleSearch(id);
   };
 
-  // Determine active view based on routing pathname
+  // Determine active view based on routing pathname, search params, and hash
   const activeView = useMemo(() => {
     const searchParams = new URLSearchParams(search);
     const pageParam = searchParams.get('page');
 
-    if (pathname === '/policy' || pageParam === 'policy') return 'POLICY';
-    if (pathname === '/privacy' || pageParam === 'privacy') return 'PRIVACY';
+    if (
+      pathname === '/policy' || 
+      pathname.endsWith('/policy') || 
+      pageParam === 'policy' || 
+      hash.includes('policy')
+    ) return 'POLICY';
+
+    if (
+      pathname === '/privacy' || 
+      pathname.endsWith('/privacy') || 
+      pageParam === 'privacy' || 
+      hash.includes('privacy')
+    ) return 'PRIVACY';
+
     if (pathname === '/hasil') return 'RESULTS';
     if (pathname === '/detail') return 'DETAIL';
     return 'LANDING';
-  }, [pathname, search]);
+  }, [pathname, search, hash]);
 
-  // Scroll to top instantly on page/view transition
+  // Scroll to top on page/view transition (unless navigating to a specific hash element)
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (!window.location.hash || window.location.hash.startsWith('#/')) {
+      window.scrollTo(0, 0);
+    }
   }, [activeView]);
 
   return (
@@ -736,6 +760,7 @@ export default function App() {
                   onBack={handleBackToLanding} 
                   onSelectOrder={handleSelectOrder}
                   onSearch={handleSearch}
+                  onShowToast={showToast}
                 />
               </motion.div>
             )}
@@ -752,6 +777,7 @@ export default function App() {
                     order={selectedOrder} 
                     onBack={handleBackToResults}
                     onConfirm={handleConfirm}
+                    onShowToast={showToast}
                   />
                 ) : (
                   <div className="text-center py-20 space-y-4" id="order-not-found-fallback">

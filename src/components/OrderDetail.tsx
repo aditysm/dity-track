@@ -10,6 +10,7 @@ interface OrderDetailProps {
   order: Order;
   onBack: () => void;
   onConfirm?: (orderId: string, type: 'qr' | 'project', status: string) => Promise<boolean> | boolean;
+  onShowToast?: (message: string) => void;
 }
 
 // Custom inline WhatsApp SVG icon
@@ -23,13 +24,20 @@ const WhatsAppIcon = () => (
   </svg>
 );
 
-export default function OrderDetail({ order, onBack }: OrderDetailProps) {
+export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: OrderDetailProps) {
   const [copied, setCopied] = useState(false);
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundTermsAccepted, setRefundTermsAccepted] = useState(false);
   const [refundReason, setRefundReason] = useState('');
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(order.id);
+    setCopied(true);
+    onShowToast?.("Berhasil disalin ke papan klip!");
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Helper to parse Google Drive URLs for direct rendering
   const getGoogleDrivePreviewUrl = (url: string) => {
@@ -41,12 +49,6 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
       return `https://docs.google.com/uc?export=view&id=${id}`;
     }
     return url;
-  };
-
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(order.id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const getStatusStepIndex = (status: Order['status']): number => {
@@ -204,6 +206,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
+
           </div>
           <h2 className="text-xl md:text-2xl font-display font-bold text-slate-800">
             {order.clientName || getEmailDisplayName(order.clientId)}
@@ -449,7 +452,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                     href={`https://wa.me/${supportWaNumber}?text=${encodeURIComponent(`Halo Admin Dity Store, saya ingin mengajukan request penggantian/perubahan data atau spesifikasi pada pesanan dengan ID *${order.id}* (atas nama *${order.clientName || 'Pelanggan'}*). Mohon bantuannya.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 font-bold underline underline-offset-2 transition-colors inline-flex items-center gap-0.5"
+                    className="text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors inline-flex items-center gap-0.5"
                   >
                     Request penggantian
                   </a>
@@ -885,7 +888,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                 <span>
                   Dengan menceklis, maka saya telah menyetujui{' '}
                   <a
-                    href="/policy"
+                    href="/policy#refund"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-bold text-rose-600 hover:text-rose-700 underline underline-offset-2 decoration-rose-500"
@@ -909,7 +912,7 @@ export default function OrderDetail({ order, onBack }: OrderDetailProps) {
                   `- Deskripsi Pesanan: ${itemDescription}\n` +
                   `- Total Dibayar: ${formatCurrency(order.totalPrice)}\n` +
                   `- Status Pesanan: ${order.status}\n` +
-                  `- Alasan: Permintaan pembatalan / pengembalian dana: ${refundReason.trim()}`;
+                  `- Alasan: ${refundReason.trim()}`;
 
                 return (
                   <a
