@@ -273,11 +273,11 @@ export default function App() {
               const normK = k.toUpperCase().replace(/[\s_]/g, '');
               for (const pk of possibleKeys) {
                 if (normK === pk.toUpperCase().replace(/[\s_]/g, '')) {
-                  return String(rObj[k] ?? '').trim();
+                  const val = String(rObj[k] ?? '').trim();
+                  if (val) return val;
                 }
               }
             }
-            return "";
           }
 
           if (rawCells && rawCells[colIdx]) {
@@ -328,8 +328,8 @@ export default function App() {
           const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
           const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
 
-          const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS"], 19);
-          const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS"], 20);
+          const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS", "SERAH_TERIMA_UNIV", "DIAMBIL_UNIV", "TAKEN_UNIV", "STATUS TAKEN UNIV"], 19);
+          const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS", "SERAH_TERIMA_FAK", "DIAMBIL_FAK", "TAKEN_FAK", "STATUS TAKEN FAK"], 20);
 
           const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 21);
           const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || 
