@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername } from '../utils';
@@ -28,6 +28,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   const [copied, setCopied] = useState(false);
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
+  const [showPickupQrPopup, setShowPickupQrPopup] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundTermsAccepted, setRefundTermsAccepted] = useState(false);
   const [refundReason, setRefundReason] = useState('');
@@ -315,6 +316,20 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                         }`}>
                           {step.desc}
                         </p>
+
+                        {step.statusKey === 'SIAP DIAMBIL' && (order.status || '').trim().toUpperCase() === 'SIAP DIAMBIL' && (
+                          <div className="pt-2.5">
+                            <button
+                              type="button"
+                              onClick={() => setShowPickupQrPopup(true)}
+                              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                              id="btn-show-pickup-qr"
+                            >
+                              <QrCode className="w-4 h-4" />
+                              <span>Tampilkan QR Pengambilan</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -948,6 +963,66 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                 Batal
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 3: QR CODE PENGAMBILAN PESANAN */}
+      {showPickupQrPopup && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-5 animate-scale-up">
+            <button 
+              onClick={() => setShowPickupQrPopup(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+              id="btn-close-pickup-qr-modal"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-1 text-center pr-6">
+              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-blue-100">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 font-display">QR Code Pengambilan Pesanan</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Tunjukkan QR ini kepada Admin saat mengambil ID Card Anda.
+              </p>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 shadow-inner">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(order.id)}`} 
+                  alt={`QR Pengambilan ${order.id}`}
+                  className="w-48 h-48 object-contain rounded-md"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200/80 rounded-lg text-blue-700 font-mono font-bold text-xs tracking-wider">
+                  {order.id}
+                </div>
+                <p className="text-xs font-semibold text-slate-700">{order.clientName || order.clientId}</p>
+              </div>
+            </div>
+
+            {/* Instruction Notice */}
+            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-center space-y-1">
+              <p className="text-[11px] text-blue-800 font-medium">
+                Admin akan memindai QR ini untuk memverifikasi penyerahan pesanan.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPickupQrPopup(false)}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+              id="btn-dismiss-pickup-qr-modal"
+            >
+              Tutup
+            </button>
           </div>
         </div>
       )}
