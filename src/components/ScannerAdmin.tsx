@@ -208,6 +208,14 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
   const matchedOrder = scannedOrder ? orders.find(o => o.id.toLowerCase() === scannedOrder.toLowerCase()) : null;
   const orderDataLower = (matchedOrder?.orderData || '').toLowerCase();
 
+  // Helper to determine if status string means already claimed/taken
+  const isStatusTaken = (statusStr: string): boolean => {
+    const s = statusStr.trim().toUpperCase();
+    if (!s) return false;
+    if (s.includes('SIAP')) return false; // "SIAP DIAMBIL" means ready for pickup, NOT taken
+    return s.includes('TAKEN') || s.includes('DIAMBIL') || s.includes('SELESAI') || s.includes('SUDAH');
+  };
+
   // Robust detection if order is 2x ID Card / Combo
   const isCombo = Boolean(
     orderDataLower.includes('combo') ||
@@ -225,18 +233,18 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
 
   // Overall order status
   const rawOverallStatus = matchedOrder?.status ? matchedOrder.status.trim().toUpperCase() : '';
-  const isOverallTaken = rawOverallStatus.includes('SELESAI') || rawOverallStatus.includes('SUDAH') || (rawOverallStatus.includes('DIAMBIL') && !rawOverallStatus.includes('SIAP')) || rawOverallStatus.includes('TAKEN');
+  const isOverallTaken = isStatusTaken(rawOverallStatus);
   const isOverallReady = !isOverallTaken && (rawOverallStatus === 'SIAP DIAMBIL' || rawOverallStatus.includes('SIAP'));
 
   // Status Univ
   const rawUnivStatus = (matchedOrder?.statusUniv || '').trim().toUpperCase();
-  const isUnivTaken = isOverallTaken || rawUnivStatus.includes('TAKEN') || rawUnivStatus.includes('DIAMBIL') || rawUnivStatus.includes('SELESAI') || Boolean(localClaims.univ) || Boolean(localClaims.all);
+  const isUnivTaken = isOverallTaken || isStatusTaken(rawUnivStatus) || Boolean(localClaims.univ) || Boolean(localClaims.all);
   const isUnivExplicitNotReady = rawUnivStatus.length > 0 && !rawUnivStatus.includes('SIAP') && !isUnivTaken;
   const isUnivReady = !isUnivTaken && (rawUnivStatus.includes('SIAP') || (isOverallReady && !isUnivExplicitNotReady));
 
   // Status Fak
   const rawFakStatus = (matchedOrder?.statusFak || '').trim().toUpperCase();
-  const isFakTaken = isOverallTaken || rawFakStatus.includes('TAKEN') || rawFakStatus.includes('DIAMBIL') || rawFakStatus.includes('SELESAI') || Boolean(localClaims.fak) || Boolean(localClaims.all);
+  const isFakTaken = isOverallTaken || isStatusTaken(rawFakStatus) || Boolean(localClaims.fak) || Boolean(localClaims.all);
   const isFakExplicitNotReady = rawFakStatus.length > 0 && !rawFakStatus.includes('SIAP') && !isFakTaken;
   const isFakReady = !isFakTaken && (rawFakStatus.includes('SIAP') || (isOverallReady && !isFakExplicitNotReady));
 
