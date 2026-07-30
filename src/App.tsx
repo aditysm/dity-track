@@ -8,6 +8,7 @@ import SearchResults from './components/SearchResults';
 import OrderDetail from './components/OrderDetail';
 import PolicyPage from './components/PolicyPage';
 import PrivacyPage from './components/PrivacyPage';
+import ScannerAdmin from './components/ScannerAdmin';
 
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
@@ -629,6 +630,13 @@ export default function App() {
       hash.includes('privacy')
     ) return 'PRIVACY';
 
+    if (
+      pathname === '/scan' || 
+      pathname.endsWith('/scan') || 
+      pageParam === 'scan' || 
+      hash.includes('scan')
+    ) return 'SCAN';
+
     if (pathname === '/hasil') return 'RESULTS';
     if (pathname === '/detail') return 'DETAIL';
     return 'LANDING';
@@ -820,6 +828,21 @@ export default function App() {
                 />
               </motion.div>
             )}
+            {activeView === 'SCAN' && (
+              <motion.div
+                key="scan"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                <ScannerAdmin 
+                  orders={orders}
+                  onBack={handleBackToLanding}
+                  onShowToast={showToast}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         )}
       </main>
@@ -827,7 +850,14 @@ export default function App() {
       {/* Footer */}
       <footer className={`w-full border-t border-blue-50/80 bg-white/50 py-6 px-4 flex flex-col items-center justify-center gap-1.5 text-center text-xs text-slate-400 mt-12 max-w-4xl mx-auto ${activeView === 'DETAIL' ? 'pb-24 md:pb-28' : ''}`} id="app-footer">
         <p className="text-[11px] text-slate-400 font-sans" id="footer-copyright">
-          &copy; 2026 Dity Track - Powered by Dity Store
+          &copy; 2026 Dity Track - Powered by{' '}
+          <button
+            onClick={() => navigate('/scan')}
+            className="font-normal text-slate-400 hover:text-slate-500 cursor-pointer inline focus:outline-none"
+            id="link-footer-dity-store"
+          >
+            Dity Store
+          </button>
         </p>
         <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 font-sans">
           <button

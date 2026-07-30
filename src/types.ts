@@ -35,6 +35,8 @@ export interface Order {
   linkProject?: string;  // LINK_PROJECT
   statusQr?: string;     // STATUS_QR
   statusProject?: string; // STATUS_PROJECT
+  statusUniv?: string;   // STATUS_UNIV
+  statusFak?: string;    // STATUS_FAK
   warnaBendera?: string; // WARNA_BENDERA
   warnaTali?: string;    // WARNA_TALI
   warnaBenderaUniv?: string; // WARNA_BENDERA_UNIV
