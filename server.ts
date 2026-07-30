@@ -100,6 +100,10 @@ const MOCK_ORDERS = [
 
 // Endpoint to fetch order status from Google Sheets SPREADSHEET_ID or fallback
 app.get("/api/orders", async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   const SPREADSHEET_ID = (process.env.SPREADSHEET_ID || "1jdwDEOGPDTWyj2buJTUfv-pm0FoBlkcIQ5ofWgHasyU").trim();
   const SHEET_NAME = "Pesanan";
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}&_t=${Date.now()}`;
@@ -122,7 +126,7 @@ app.get("/api/orders", async (req, res) => {
 
   try {
     const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}&_t=${Date.now()}`;
-    const resp = await fetch(responsesUrl);
+    const resp = await fetch(responsesUrl, { cache: 'no-store' });
     if (resp.ok) {
       const respText = await resp.text();
       const respMatch = respText.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
@@ -180,7 +184,7 @@ app.get("/api/orders", async (req, res) => {
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`Google Sheets returned status ${response.status}`);
     }

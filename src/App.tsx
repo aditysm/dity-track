@@ -109,7 +109,7 @@ export default function App() {
 
     try {
       // 1. Try fetching from server API first
-      const response = await fetch('/api/orders');
+      const response = await fetch('/api/orders', { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Server API status ${response.status}`);
       }
@@ -187,7 +187,7 @@ export default function App() {
         
         try {
           const responsesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Form Responses 1")}&_t=${Date.now()}`;
-          const resp = await fetch(responsesUrl);
+          const resp = await fetch(responsesUrl, { cache: 'no-store' });
           if (resp.ok) {
             const respText = await resp.text();
             const respMatch = respText.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
@@ -238,7 +238,7 @@ export default function App() {
           console.warn('[App] Direct client name mapping fetch failed:', e);
         }
 
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) {
           throw new Error(`Google Sheets direct fetch returned status ${response.status}`);
         }
