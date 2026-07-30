@@ -17,3 +17,28 @@
   animation: scanLaser 2s infinite ease-in-out;
 }
 
+/* Hide default html5-qrcode grey border boxes and regions */
+#reader {
+  border: none !important;
+}
+
+#reader * {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+#reader video {
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#reader__scan_region {
+  border: none !important;
+  background: transparent !important;
+}
+
+#reader__dashboard {
+  display: none !important;
+}
+

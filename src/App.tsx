@@ -328,6 +328,9 @@ export default function App() {
           const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
           const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
 
+          const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS"], 19);
+          const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS"], 20);
+
           const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 21);
           const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || 
                              String(rawBisaRefund || "").trim().toUpperCase() === "YA" || 
@@ -349,6 +352,8 @@ export default function App() {
             linkProject: cleanLink(rawLinkProject),
             statusQr: rawStatusQr || "",
             statusProject: rawStatusProject || "",
+            statusUniv: rawStatusUniv || "",
+            statusFak: rawStatusFak || "",
             warnaBendera: rawWarnaBendera,
             warnaTali: rawWarnaTali,
             warnaBenderaUniv: rawWarnaBenderaUniv,

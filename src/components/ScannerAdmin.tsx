@@ -31,6 +31,8 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
   const [statusMsg, setStatusMsg] = useState<{ text: string; isSuccess: boolean } | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [pendingClaimType, setPendingClaimType] = useState<'univ' | 'fak' | 'all' | null>(null);
+  const [claimedMap, setClaimedMap] = useState<Record<string, { univ?: boolean; fak?: boolean; all?: boolean }>>({});
   const qrRef = useRef<Html5Qrcode | null>(null);
 
   // Stop camera on unmount
@@ -132,6 +134,8 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
     setLoading(true);
     setStatusMsg(null);
 
+    const orderKey = scannedOrder.toLowerCase();
+
     try {
       const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
@@ -144,14 +148,37 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
       });
 
       const resData = await response.json();
+
+      // Update local claim state map
+      setClaimedMap((prev) => {
+        const existing = prev[orderKey] || {};
+        if (claimType === 'univ') return { ...prev, [orderKey]: { ...existing, univ: true } };
+        if (claimType === 'fak') return { ...prev, [orderKey]: { ...existing, fak: true } };
+        return { ...prev, [orderKey]: { univ: true, fak: true, all: true } };
+      });
+
+      // Check if order is complete
+      const isNowComplete = resData.is_complete || !isCombo || claimType === 'all' || 
+        (claimType === 'univ' && (isFakTaken || Boolean(claimedMap[orderKey]?.fak))) ||
+        (claimType === 'fak' && (isUnivTaken || Boolean(claimedMap[orderKey]?.univ)));
+
       if (resData.success) {
-        const msg = resData.is_complete 
+        const msg = isNowComplete 
           ? "Pesanan Selesai Diserahkan" 
           : "Penyerahan Parsial Berhasil Dicatat";
         setStatusMsg({ text: msg, isSuccess: true });
         onShowToast?.(msg, "success");
+
+        // Automatically close popup if order is complete or single item
+        if (isNowComplete) {
+          setTimeout(() => {
+            setScannedOrder(null);
+            setStatusMsg(null);
+            setPendingClaimType(null);
+          }, 1200);
+        }
       } else {
-        const errMsg = "Gagal: " + (resData.message || resData.error || "Order ID tidak ditemukan");
+        const errMsg = "Gagal: " + (resData.message || resData.error || "Pesanan tidak dapat diproses");
         setStatusMsg({ text: errMsg, isSuccess: false });
         onShowToast?.(errMsg, "error");
       }
@@ -160,6 +187,18 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
       const msg = "Penyerahan Berhasil Diproses";
       setStatusMsg({ text: msg, isSuccess: true });
       onShowToast?.(msg, "success");
+
+      setClaimedMap((prev) => ({
+        ...prev,
+        [orderKey]: { univ: true, fak: true, all: true }
+      }));
+
+      // Fallback auto-close popup
+      setTimeout(() => {
+        setScannedOrder(null);
+        setStatusMsg(null);
+        setPendingClaimType(null);
+      }, 1200);
     } finally {
       setLoading(false);
     }
@@ -167,7 +206,50 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
 
   // Find matching order in local state if available
   const matchedOrder = scannedOrder ? orders.find(o => o.id.toLowerCase() === scannedOrder.toLowerCase()) : null;
-  const isCombo = matchedOrder?.orderData?.toLowerCase().includes('combo') || matchedOrder?.orderData?.includes('2x ID Card');
+  const orderDataLower = (matchedOrder?.orderData || '').toLowerCase();
+
+  // Robust detection if order is 2x ID Card / Combo
+  const isCombo = Boolean(
+    orderDataLower.includes('combo') ||
+    orderDataLower.includes('2x') ||
+    orderDataLower.includes('2 id') ||
+    orderDataLower.includes('dua id') ||
+    (orderDataLower.includes('univ') && orderDataLower.includes('fak')) ||
+    matchedOrder?.statusUniv ||
+    matchedOrder?.statusFak
+  );
+
+  // Status checks for current order & local claims
+  const orderKey = scannedOrder ? scannedOrder.toLowerCase() : '';
+  const localClaims = claimedMap[orderKey] || {};
+
+  // Overall order status
+  const rawOverallStatus = matchedOrder?.status ? matchedOrder.status.trim().toUpperCase() : '';
+  const isOverallReady = rawOverallStatus === 'SIAP DIAMBIL' || rawOverallStatus.includes('SIAP');
+
+  // Status Univ
+  const rawUnivStatus = (matchedOrder?.statusUniv || '').trim().toUpperCase();
+  const isUnivTaken = rawUnivStatus.includes('TAKEN') || rawUnivStatus.includes('DIAMBIL') || Boolean(localClaims.univ) || Boolean(localClaims.all);
+  const isUnivExplicitNotReady = rawUnivStatus.length > 0 && !rawUnivStatus.includes('SIAP') && !isUnivTaken;
+  const isUnivReady = !isUnivTaken && (rawUnivStatus.includes('SIAP') || (isOverallReady && !isUnivExplicitNotReady));
+
+  // Status Fak
+  const rawFakStatus = (matchedOrder?.statusFak || '').trim().toUpperCase();
+  const isFakTaken = rawFakStatus.includes('TAKEN') || rawFakStatus.includes('DIAMBIL') || Boolean(localClaims.fak) || Boolean(localClaims.all);
+  const isFakExplicitNotReady = rawFakStatus.length > 0 && !rawFakStatus.includes('SIAP') && !isFakTaken;
+  const isFakReady = !isFakTaken && (rawFakStatus.includes('SIAP') || (isOverallReady && !isFakExplicitNotReady));
+
+  // Format order specification split by '|'
+  const specLines = (matchedOrder?.orderData || '')
+    .split('|')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const getClaimLabel = (type: 'univ' | 'fak' | 'all' | null) => {
+    if (type === 'univ') return 'ID Card Universitas';
+    if (type === 'fak') return 'ID Card Fakultas';
+    return isCombo ? 'Kedua ID Card (Univ & Fak)' : 'Pesanan';
+  };
 
   // Render Password Lock Screen if not authenticated
   if (!isAuthenticated) {
@@ -350,8 +432,8 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
               <div className="absolute inset-0 z-30 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3">
                 <RefreshCw className="w-9 h-9 text-blue-600 animate-spin" />
                 <div>
-                  <p className="text-sm font-bold text-slate-800">Memproses Serah Terima...</p>
-                  <p className="text-xs text-slate-500 mt-1">Mohon tunggu sebentar, data sedang dikirim ke database Dity Track.</p>
+                  <p className="text-sm font-bold text-slate-800">Sedang Memproses Serah Terima...</p>
+                  <p className="text-xs text-slate-500 mt-1">Mohon tunggu sebentar, status penyerahan sedang diperbarui.</p>
                 </div>
               </div>
             )}
@@ -370,7 +452,7 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
                 )}
               </div>
               <button
-                onClick={() => { setScannedOrder(null); setStatusMsg(null); }}
+                onClick={() => { setScannedOrder(null); setStatusMsg(null); setPendingClaimType(null); }}
                 disabled={loading}
                 className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors cursor-pointer disabled:opacity-50"
                 title="Tutup"
@@ -379,64 +461,149 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
               </button>
             </div>
 
-            {/* Spesifikasi Pesanan */}
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                SPESIFIKASI PESANAN
-              </span>
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-700 leading-relaxed font-sans max-h-28 overflow-y-auto">
-                {matchedOrder?.orderData || "Rincian spesifikasi pesanan Dity Track."}
-              </div>
-            </div>
-
-            {/* Action Buttons for Claim */}
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                PILIH AKSI SERAH TERIMA
-              </span>
-
-              {isCombo ? (
-                /* Combo item (2x ID Card) -> 3 buttons */
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => handleClaim('univ')}
-                    disabled={loading}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    <Award className="w-4 h-4" />
-                    <span>Serahkan ID Card Univ</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleClaim('fak')}
-                    disabled={loading}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    <Building2 className="w-4 h-4" />
-                    <span>Serahkan ID Card Fak</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleClaim('all')}
-                    disabled={loading}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Serahkan Keduanya Sekaligus</span>
-                  </button>
+            {/* Status Validation Warning if NOT 'SIAP DIAMBIL' */}
+            {(!isOverallReady && !isUnivReady && !isFakReady) ? (
+              <div className="bg-rose-50 border border-rose-200/90 rounded-2xl p-4 text-center space-y-2.5">
+                <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-5 h-5" />
                 </div>
-              ) : (
-                /* Single item -> 1 button */
-                <button
-                  onClick={() => handleClaim('all')}
-                  disabled={loading}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Konfirmasi Serah Terima Pesanan</span>
-                </button>
-              )}
-            </div>
+                <div>
+                  <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wide">Pesanan Ditolak / Belum Siap</h4>
+                  <p className="text-xs text-rose-600 mt-1 font-semibold">
+                    Status Pesanan Saat Ini: <span className="bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-md font-mono text-[11px]">{matchedOrder?.status || 'TIDAK DIKETAHUI'}</span>
+                  </p>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                  Serah terima hanya dapat dilakukan jika status pesanan di sistem adalah <strong className="text-emerald-700">SIAP DIAMBIL</strong>.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Spesifikasi Pesanan (Multi-line separated by '|') */}
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    SPESIFIKASI PESANAN
+                  </span>
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-2 max-h-36 overflow-y-auto">
+                    {specLines.length > 0 ? (
+                      specLines.map((line, idx) => {
+                        const colonIdx = line.indexOf(':');
+                        if (colonIdx !== -1) {
+                          const key = line.slice(0, colonIdx).trim();
+                          const val = line.slice(colonIdx + 1).trim();
+                          return (
+                            <div key={idx} className="text-xs text-slate-700 flex items-start gap-1">
+                              <span className="font-bold text-slate-900 min-w-max">{key}:</span>
+                              <span className="text-slate-600">{val}</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={idx} className="text-xs text-slate-700 font-medium flex items-start gap-1.5">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <span>{line}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-500">Rincian spesifikasi pesanan Dity Track.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons for Claim */}
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                    PILIH AKSI SERAH TERIMA
+                  </span>
+
+                  {isCombo ? (
+                    /* Combo item (2x ID Card) -> 3 buttons */
+                    <div className="flex flex-col gap-2">
+                      {/* Button Univ */}
+                      <button
+                        onClick={() => setPendingClaimType('univ')}
+                        disabled={loading || isUnivTaken || !isUnivReady}
+                        className={`w-full py-3 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                          isUnivTaken 
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : !isUnivReady
+                            ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                            : 'bg-blue-600 hover:bg-blue-700 active:scale-98 text-white'
+                        }`}
+                      >
+                        <Award className="w-4 h-4" />
+                        <span>
+                          {isUnivTaken 
+                            ? 'ID Card Univ (Sudah Diambil)' 
+                            : !isUnivReady 
+                            ? 'ID Card Univ (Belum Siap)' 
+                            : 'Serahkan ID Card Univ'}
+                        </span>
+                      </button>
+
+                      {/* Button Fak */}
+                      <button
+                        onClick={() => setPendingClaimType('fak')}
+                        disabled={loading || isFakTaken || !isFakReady}
+                        className={`w-full py-3 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                          isFakTaken 
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : !isFakReady
+                            ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                            : 'bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white'
+                        }`}
+                      >
+                        <Building2 className="w-4 h-4" />
+                        <span>
+                          {isFakTaken 
+                            ? 'ID Card Fak (Sudah Diambil)' 
+                            : !isFakReady 
+                            ? 'ID Card Fak (Belum Siap)' 
+                            : 'Serahkan ID Card Fak'}
+                        </span>
+                      </button>
+
+                      {/* Button Both */}
+                      <button
+                        onClick={() => setPendingClaimType('all')}
+                        disabled={loading || !isUnivReady || !isFakReady || isUnivTaken || isFakTaken}
+                        className={`w-full py-3 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                          (isUnivTaken && isFakTaken)
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : (!isUnivReady || !isFakReady || isUnivTaken || isFakTaken)
+                            ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>
+                          {(isUnivTaken && isFakTaken)
+                            ? 'Kedua ID Card (Sudah Diambil)'
+                            : (!isUnivReady || !isFakReady)
+                            ? 'Serahkan Keduanya (Salah Satu Belum Siap)'
+                            : 'Serahkan Keduanya Sekaligus'}
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* Single item -> 1 button */
+                    <button
+                      onClick={() => setPendingClaimType('all')}
+                      disabled={loading || !isOverallReady}
+                      className={`w-full py-3 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                        !isOverallReady
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                          : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{!isOverallReady ? 'Pesanan Belum Siap' : 'Konfirmasi Serah Terima Pesanan'}</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Status Alert Result */}
             {statusMsg && (
@@ -451,7 +618,7 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
             )}
 
             <button
-              onClick={() => { setScannedOrder(null); setStatusMsg(null); }}
+              onClick={() => { setScannedOrder(null); setStatusMsg(null); setPendingClaimType(null); }}
               disabled={loading}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
             >
@@ -460,6 +627,42 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
           </div>
         </div>
       )}
+
+      {/* DOUBLE CONFIRMATION MODAL */}
+      {pendingClaimType && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-sm p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto border border-blue-100 shadow-xs">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-800">Konfirmasi Penyerahan</h4>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Apakah Anda yakin ingin menyerahkan <strong className="text-slate-900 font-bold">{getClaimLabel(pendingClaimType)}</strong> kepada <strong className="text-slate-900 font-bold">{matchedOrder?.clientName || matchedOrder?.clientId || 'klien'}</strong>?
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                onClick={() => setPendingClaimType(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  const claimType = pendingClaimType;
+                  setPendingClaimType(null);
+                  handleClaim(claimType);
+                }}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                Ya, Serahkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
