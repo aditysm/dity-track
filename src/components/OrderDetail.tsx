@@ -13,6 +13,8 @@ interface OrderDetailProps {
   onShowToast?: (message: string) => void;
 }
 
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
+
 const cleanNoKelompokStr = (val: string | undefined): string => {
   if (!val) return '';
   return String(val).replace(/[^0-9]/g, '').trim();
@@ -1205,6 +1207,11 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                         return;
                       }
                       setIsSavingGroup(true);
+
+                      let success = false;
+                      let syncError = '';
+
+                      // 1. Try server-side Express API first
                       try {
                         const response = await fetch('/api/orders/group', {
                           method: 'POST',
@@ -1216,33 +1223,65 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                             noKelompok: parseInt(trimmed, 10)
                           })
                         });
-                        const result = await response.json();
-                        if (result.success) {
-                          localStorage.setItem(`group_${order.id}`, trimmed);
-                          setSavedGroup(trimmed);
-                          setShowGroupPopup(false);
-                          setIsConfirmingGroup(false);
-                          onShowToast?.(`Kelompok berhasil diatur ke kelompok ${trimmed}`);
-                          
-                          // Custom window callback to trigger a refresh of the order list if defined
-                          if (typeof window !== 'undefined' && (window as any).refreshOrders) {
-                            (window as any).refreshOrders();
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          if (result.success) {
+                            success = true;
+                          } else {
+                            syncError = result.syncError || 'Kesalahan Server';
                           }
                         } else {
-                          localStorage.setItem(`group_${order.id}`, trimmed);
-                          setSavedGroup(trimmed);
-                          setShowGroupPopup(false);
-                          setIsConfirmingGroup(false);
-                          onShowToast?.(`Kelompok disimpan di perangkat. Gagal kirim ke database: ${result.syncError || 'Kesalahan Server'}`);
+                          throw new Error(`HTTP status ${response.status}`);
                         }
-                      } catch (err) {
-                        localStorage.setItem(`group_${order.id}`, trimmed);
-                        setSavedGroup(trimmed);
-                        setShowGroupPopup(false);
-                        setIsConfirmingGroup(false);
-                        onShowToast?.(`Kelompok disimpan di perangkat. Gagal terhubung ke server.`);
-                      } finally {
-                        setIsSavingGroup(false);
+                      } catch (err: any) {
+                        console.warn('[OrderDetail] Server-side group update failed, falling back to direct Google Apps Script call...', err);
+
+                        // 2. Fallback: Direct client-side Google Apps Script fetch
+                        try {
+                          const response = await fetch(APPS_SCRIPT_URL, {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "text/plain;charset=utf-8"
+                            },
+                            body: JSON.stringify({
+                              action: "update_kelompok",
+                              order_id: order.id,
+                              no_kelompok: parseInt(trimmed, 10)
+                            })
+                          });
+
+                          if (response.ok) {
+                            const result = await response.json();
+                            if (result.success || result.status === 'success') {
+                              success = true;
+                            } else {
+                              syncError = result.message || result.error || 'Google Sheets returned status: error';
+                            }
+                          } else {
+                            syncError = `Apps Script HTTP ${response.status}`;
+                          }
+                        } catch (directErr: any) {
+                          console.error('[OrderDetail] Direct Google Apps Script update failed too:', directErr);
+                          syncError = directErr.message || 'Gagal terhubung ke Apps Script';
+                        }
+                      }
+
+                      // Save and show result
+                      localStorage.setItem(`group_${order.id}`, trimmed);
+                      setSavedGroup(trimmed);
+                      setShowGroupPopup(false);
+                      setIsConfirmingGroup(false);
+                      setIsSavingGroup(false);
+
+                      if (success) {
+                        onShowToast?.(`Kelompok berhasil diatur ke kelompok ${trimmed}`);
+                        // Custom window callback to trigger a refresh of the order list if defined
+                        if (typeof window !== 'undefined' && (window as any).refreshOrders) {
+                          (window as any).refreshOrders();
+                        }
+                      } else {
+                        onShowToast?.(`Kelompok disimpan di perangkat. Gagal sinkronisasi ke database: ${syncError}`);
                       }
                     }}
                     disabled={isSavingGroup}
