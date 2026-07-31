@@ -116,32 +116,39 @@ export default function App() {
       
       const data = await response.json();
       if (data.success && data.orders) {
-        const parsedOrders: Order[] = data.orders.map((o: any) => ({
-          id: o.ORDER_ID,
-          clientId: o.CLIENT_ID,
-          clientName: o.CLIENT_NAME || '',
-          contact: o.CONTACT,
-          status: o.STATUS as Order['status'],
-          totalPrice: o.TOTAL_PRICE,
-          createdAt: o.CREATED_AT,
-          finishedAt: o.FINISHED_AT,
-          orderData: o.ORDER_DATA,
-          gformRow: o.GFORM_ROW,
-          parsedData: parseOrderData(o.ORDER_DATA),
-          linkQr: o.LINK_QR || '',
-          linkProject: o.LINK_PROJECT || '',
-          statusQr: o.STATUS_QR || '',
-          statusProject: o.STATUS_PROJECT || '',
-          warnaBendera: o.WARNA_BENDERA || '',
-          warnaTali: o.WARNA_TALI || '',
-          warnaBenderaUniv: o.WARNA_BENDERA_UNIV || '',
-          warnaBenderaFak: o.WARNA_BENDERA_FAK || '',
-          warnaTaliUniv: o.WARNA_TALI_UNIV || '',
-          warnaTaliFak: o.WARNA_TALI_FAK || '',
-          ukuranCaseUniv: o.UKURAN_CASE_UNIV || '',
-          ukuranCaseFak: o.UKURAN_CASE_FAK || '',
-          bisaRefund: !!o.BISA_REFUND
-        }));
+        const parsedOrders: Order[] = data.orders.map((o: any) => {
+          const noKelompokClean = String(o.NO_KELOMPOK || '').replace(/[^0-9]/g, '').trim();
+          if (o.ORDER_ID) {
+            localStorage.setItem(`group_${o.ORDER_ID}`, noKelompokClean);
+          }
+          return {
+            id: o.ORDER_ID,
+            clientId: o.CLIENT_ID,
+            clientName: o.CLIENT_NAME || '',
+            contact: o.CONTACT,
+            status: o.STATUS as Order['status'],
+            totalPrice: o.TOTAL_PRICE,
+            createdAt: o.CREATED_AT,
+            finishedAt: o.FINISHED_AT,
+            orderData: o.ORDER_DATA,
+            gformRow: o.GFORM_ROW,
+            parsedData: parseOrderData(o.ORDER_DATA),
+            linkQr: o.LINK_QR || '',
+            linkProject: o.LINK_PROJECT || '',
+            statusQr: o.STATUS_QR || '',
+            statusProject: o.STATUS_PROJECT || '',
+            warnaBendera: o.WARNA_BENDERA || '',
+            warnaTali: o.WARNA_TALI || '',
+            warnaBenderaUniv: o.WARNA_BENDERA_UNIV || '',
+            warnaBenderaFak: o.WARNA_BENDERA_FAK || '',
+            warnaTaliUniv: o.WARNA_TALI_UNIV || '',
+            warnaTaliFak: o.WARNA_TALI_FAK || '',
+            ukuranCaseUniv: o.UKURAN_CASE_UNIV || '',
+            ukuranCaseFak: o.UKURAN_CASE_FAK || '',
+            bisaRefund: !!o.BISA_REFUND,
+            noKelompok: noKelompokClean
+          };
+        });
         
         setOrders(parsedOrders);
         setIsFallback(data.source === 'fallback-mock-data');
@@ -331,6 +338,11 @@ export default function App() {
           const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 18);
           const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS", "SERAH_TERIMA_UNIV", "DIAMBIL_UNIV", "TAKEN_UNIV", "STATUS TAKEN UNIV"], 19);
           const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS", "SERAH_TERIMA_FAK", "DIAMBIL_FAK", "TAKEN_FAK", "STATUS TAKEN FAK"], 20);
+          const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 21);
+          const noKelompokClean = rawNoKelompok ? String(rawNoKelompok).replace(/[^0-9]/g, '').trim() : '';
+          if (orderId) {
+            localStorage.setItem(`group_${orderId}`, noKelompokClean);
+          }
           const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || 
                              String(rawBisaRefund || "").trim().toUpperCase() === "YA" || 
                              String(rawBisaRefund || "").trim() === "1";
@@ -361,7 +373,8 @@ export default function App() {
             warnaTaliFak: rawWarnaTaliFak,
             ukuranCaseUniv: rawUkuranCaseUniv,
             ukuranCaseFak: rawUkuranCaseFak,
-            bisaRefund: bisaRefund
+            bisaRefund: bisaRefund,
+            noKelompok: noKelompokClean
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         

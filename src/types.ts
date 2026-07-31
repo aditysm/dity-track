@@ -46,4 +46,5 @@ export interface Order {
   ukuranCaseUniv?: string;   // UKURAN_CASE_UNIV
   ukuranCaseFak?: string;    // UKURAN_CASE_FAK
   bisaRefund?: boolean;      // BISA_REFUND
+  noKelompok?: string;       // NO_KELOMPOK
 }

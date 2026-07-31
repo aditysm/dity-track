@@ -77,7 +77,7 @@ export default function SearchResults({ query, results, onBack, onSelectOrder, o
       case 'DIBUAT':
         return {
           bg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-          label: 'Pembuatan & Pemotongan'
+          label: 'Pembuatan'
         };
       case 'SIAP DIAMBIL':
         return {

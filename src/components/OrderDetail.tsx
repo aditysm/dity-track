@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername } from '../utils';
@@ -12,6 +12,11 @@ interface OrderDetailProps {
   onConfirm?: (orderId: string, type: 'qr' | 'project', status: string) => Promise<boolean> | boolean;
   onShowToast?: (message: string) => void;
 }
+
+const cleanNoKelompokStr = (val: string | undefined): string => {
+  if (!val) return '';
+  return String(val).replace(/[^0-9]/g, '').trim();
+};
 
 // Custom inline WhatsApp SVG icon
 const WhatsAppIcon = () => (
@@ -32,6 +37,18 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundTermsAccepted, setRefundTermsAccepted] = useState(false);
   const [refundReason, setRefundReason] = useState('');
+
+  const [showGroupPopup, setShowGroupPopup] = useState(false);
+  const [groupInput, setGroupInput] = useState('');
+  const [isConfirmingGroup, setIsConfirmingGroup] = useState(false);
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+  const [savedGroup, setSavedGroup] = useState<string>(() => {
+    return cleanNoKelompokStr(order.noKelompok) || localStorage.getItem(`group_${order.id}`) || '';
+  });
+
+  useEffect(() => {
+    setSavedGroup(cleanNoKelompokStr(order.noKelompok) || localStorage.getItem(`group_${order.id}`) || '');
+  }, [order.noKelompok, order.id]);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(order.id);
@@ -85,8 +102,8 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
       statusKey: 'DIKERJAKAN'
     },
     {
-      title: 'Proses Pembuatan & Pemotongan',
-      desc: 'Desain telah dikunci dan sedang dalam produksi cetak ID Card serta proses pemotongan presisi.',
+      title: 'Proses Pembuatan',
+      desc: 'Desain telah dikunci dan sedang dalam produksi cetak ID Card.',
       statusKey: 'DIBUAT'
     },
     {
@@ -328,6 +345,54 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                               <QrCode className="w-4 h-4" />
                               <span>Tampilkan QR Pengambilan</span>
                             </button>
+                          </div>
+                        )}
+
+                        {step.statusKey === 'DIKERJAKAN' && showUnivCard && ((order.status || '').trim().toUpperCase() === 'DIPROSES' || (order.status || '').trim().toUpperCase() === 'DIKERJAKAN') && (
+                          <div className="pt-2.5 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupInput(savedGroup);
+                                setIsConfirmingGroup(false);
+                                setShowGroupPopup(true);
+                              }}
+                              className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
+                              id="btn-set-group-dikerjakan"
+                            >
+                              <Users className="w-4 h-4" />
+                              <span>Atur Kelompok Saya</span>
+                            </button>
+                            {savedGroup && (
+                              <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] font-semibold text-indigo-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                <span>Kelompok: {savedGroup}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {step.statusKey === 'DIBUAT' && showUnivCard && (order.status || '').trim().toUpperCase() === 'DIBUAT' && (
+                          <div className="pt-2.5 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupInput(savedGroup);
+                                setIsConfirmingGroup(false);
+                                setShowGroupPopup(true);
+                              }}
+                              className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
+                              id="btn-set-group-dibuat"
+                            >
+                              <Users className="w-4 h-4" />
+                              <span>Atur Kelompok Saya</span>
+                            </button>
+                            {savedGroup && (
+                              <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] font-semibold text-indigo-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                <span>Kelompok: {savedGroup}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1023,6 +1088,179 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
             >
               Tutup
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 4: ATUR KELOMPOK SAYA */}
+      {showGroupPopup && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-5 animate-scale-up">
+            <button 
+              onClick={() => {
+                if (!isSavingGroup) {
+                  setShowGroupPopup(false);
+                  setIsConfirmingGroup(false);
+                }
+              }}
+              disabled={isSavingGroup}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-all cursor-pointer disabled:opacity-50"
+              id="btn-close-group-modal"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {!isConfirmingGroup ? (
+              // Form Input State
+              <div className="space-y-5">
+                <div className="space-y-1.5 text-center pr-6">
+                  <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-indigo-100">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 font-display">Atur Kelompok Saya</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Masukkan nomor kelompok Anda untuk mempermudah identifikasi pengerjaan ID Card Universitas.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="group-name-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Nomor Kelompok
+                  </label>
+                  <input
+                    id="group-name-input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={groupInput}
+                    onChange={(e) => setGroupInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="Contoh: 25"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-sm text-slate-800 transition-all placeholder:text-slate-400"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowGroupPopup(false)}
+                    className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 active:scale-98 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer text-center"
+                    id="btn-cancel-group-input"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = groupInput.trim();
+                      if (!trimmed) {
+                        onShowToast?.("Nomor kelompok tidak boleh kosong.");
+                        return;
+                      }
+                      setIsConfirmingGroup(true);
+                    }}
+                    disabled={!groupInput.trim()}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/10 transition-all cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="btn-confirm-group-input"
+                  >
+                    Atur Kelompok
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Confirmation View State
+              <div className="space-y-5">
+                <div className="space-y-1.5 text-center">
+                  <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-amber-100">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 font-display">Konfirmasi Atur Kelompok</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Apakah Anda yakin ingin mengatur nomor kelompok Anda?
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-1">
+                  <p className="text-xs text-slate-500">Nomor Kelompok Baru Anda:</p>
+                  <p className="text-sm font-extrabold text-slate-800 tracking-wide font-display">Kelompok {groupInput}</p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingGroup(false)}
+                    disabled={isSavingGroup}
+                    className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 active:scale-98 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer text-center disabled:opacity-50"
+                    id="btn-back-to-input"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const trimmed = groupInput.trim();
+                      if (!trimmed) {
+                        onShowToast?.("Nomor kelompok tidak boleh kosong.");
+                        return;
+                      }
+                      setIsSavingGroup(true);
+                      try {
+                        const response = await fetch('/api/orders/group', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({
+                            orderId: order.id,
+                            noKelompok: parseInt(trimmed, 10)
+                          })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          localStorage.setItem(`group_${order.id}`, trimmed);
+                          setSavedGroup(trimmed);
+                          setShowGroupPopup(false);
+                          setIsConfirmingGroup(false);
+                          onShowToast?.(`Kelompok berhasil diatur ke kelompok ${trimmed}`);
+                          
+                          // Custom window callback to trigger a refresh of the order list if defined
+                          if (typeof window !== 'undefined' && (window as any).refreshOrders) {
+                            (window as any).refreshOrders();
+                          }
+                        } else {
+                          localStorage.setItem(`group_${order.id}`, trimmed);
+                          setSavedGroup(trimmed);
+                          setShowGroupPopup(false);
+                          setIsConfirmingGroup(false);
+                          onShowToast?.(`Kelompok disimpan di perangkat. Gagal kirim ke database: ${result.syncError || 'Kesalahan Server'}`);
+                        }
+                      } catch (err) {
+                        localStorage.setItem(`group_${order.id}`, trimmed);
+                        setSavedGroup(trimmed);
+                        setShowGroupPopup(false);
+                        setIsConfirmingGroup(false);
+                        onShowToast?.(`Kelompok disimpan di perangkat. Gagal terhubung ke server.`);
+                      } finally {
+                        setIsSavingGroup(false);
+                      }
+                    }}
+                    disabled={isSavingGroup}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/10 transition-all cursor-pointer text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    id="btn-save-group-confirmed"
+                  >
+                    {isSavingGroup ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <span>Ya, Konfirmasi</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

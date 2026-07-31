@@ -293,6 +293,8 @@ app.get("/api/orders", async (req, res) => {
                          String(rawBisaRefund || "").trim().toUpperCase() === "YA" || 
                          String(rawBisaRefund || "").trim() === "1";
 
+      const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 22);
+
       return {
         ORDER_ID: orderId,
         CLIENT_ID: clientId,
@@ -316,7 +318,8 @@ app.get("/api/orders", async (req, res) => {
         WARNA_TALI_FAK: rawWarnaTaliFak,
         UKURAN_CASE_UNIV: rawUkuranCaseUniv,
         UKURAN_CASE_FAK: rawUkuranCaseFak,
-        BISA_REFUND: bisaRefund
+        BISA_REFUND: bisaRefund,
+        NO_KELOMPOK: rawNoKelompok ? String(rawNoKelompok).trim() : ""
       };
     }).filter((order: any) => order.ORDER_ID !== "" && order.ORDER_ID !== "ORDER_ID"); // Filter headers or empty items
 
@@ -428,6 +431,83 @@ app.post("/api/orders/confirm", async (req, res) => {
     success: syncedWithSheets,
     syncedWithSheets,
     syncError
+  });
+});
+
+// Endpoint to update group number (NO_KELOMPOK)
+app.post("/api/orders/group", async (req, res) => {
+  const { orderId, noKelompok } = req.body;
+  if (!orderId) {
+    return res.status(400).json({ success: false, message: "ORDER_ID atau CLIENT_ID wajib disertakan." });
+  }
+
+  // Sanitasi: Pastikan hanya berupa angka
+  let cleanNoKelompok = "";
+  if (noKelompok !== undefined && noKelompok !== null) {
+    cleanNoKelompok = String(noKelompok).replace(/[^0-9]/g, "").trim();
+  }
+
+  if (cleanNoKelompok === "") {
+    return res.status(400).json({ success: false, message: "NO_KELOMPOK harus berupa angka yang valid." });
+  }
+
+  const numericKelompok = Number(cleanNoKelompok);
+  const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbyz2irrGBi5tCo0cmot-OWIOxkTU0B66c5K1f9Y0jWVtCBENJJjNtvtzIoPXYcFSwpw/exec";
+  let syncedWithSheets = false;
+  let syncError = null;
+
+  if (APPS_SCRIPT_URL) {
+    try {
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8" // Menghindari preflight CORS
+        },
+        body: JSON.stringify({
+          action: "update_kelompok",
+          order_id: orderId,
+          no_kelompok: numericKelompok
+        })
+      });
+
+      if (response.ok) {
+        const textResponse = await response.text();
+        const lowerText = textResponse.toLowerCase();
+        let result: any = null;
+
+        if (!lowerText.includes("<html") && !lowerText.includes("<!doctype") && !lowerText.includes("script function not found") && !lowerText.includes("page not found")) {
+          try {
+            result = JSON.parse(textResponse);
+          } catch (e) {
+            const trimmed = textResponse.trim().toUpperCase();
+            if (trimmed === "OK" || trimmed === "SUCCESS" || trimmed.includes("SUCCESS")) {
+              result = { status: "success" };
+            }
+          }
+        }
+
+        if (result && (result.success === true || result.status === "success" || result.result === "success")) {
+          syncedWithSheets = true;
+          console.log(`[Server] Group update success for order ${orderId} with kelompok ${numericKelompok}`);
+        } else {
+          syncError = result ? (result.message || result.error || "Google Sheets returned status: error") : `Google Apps Script returned invalid response`;
+          console.warn(`[Server] Group update failed: ${syncError}`);
+        }
+      } else {
+        syncError = `HTTP status ${response.status}`;
+        console.warn(`[Server] Group update HTTP error: ${syncError}`);
+      }
+    } catch (err: any) {
+      syncError = err.message || "Unknown error";
+      console.warn(`[Server] Failed to connect to APPS_SCRIPT_URL for group update: ${syncError}`);
+    }
+  }
+
+  return res.json({
+    success: syncedWithSheets,
+    syncedWithSheets,
+    syncError,
+    noKelompok: numericKelompok
   });
 });
 
