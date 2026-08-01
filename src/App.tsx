@@ -134,6 +134,7 @@ export default function App() {
             gformRow: o.GFORM_ROW,
             parsedData: parseOrderData(o.ORDER_DATA),
             linkQr: o.LINK_QR || '',
+            linkClient: o.LINK_CLIENT || '',
             linkProject: o.LINK_PROJECT || '',
             statusQr: o.STATUS_QR || '',
             statusProject: o.STATUS_PROJECT || '',
@@ -316,7 +317,8 @@ export default function App() {
           const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
 
           const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "QR_LINK", "LINKQR"], 9);
-          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 10);
+          const rawLinkClient = getCellByCol(rObj, rawCells, ["LINK_CLIENT", "CLIENT_LINK", "LINKCLIENT"], 10);
+          const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 11);
 
           const cleanLink = (val: string) => {
             const s = String(val || "").trim();
@@ -324,9 +326,6 @@ export default function App() {
             if (!s.toLowerCase().startsWith("http://") && !s.toLowerCase().startsWith("https://")) return "";
             return s;
           };
-
-          const rawWarnaBendera = getCellByCol(rObj, rawCells, ["WARNA_BENDERA", "WARNA BENDERA"], 13);
-          const rawWarnaTali = getCellByCol(rObj, rawCells, ["WARNA_TALI", "WARNA TALI"], 14);
 
           const rawWarnaBenderaUniv = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_UNIV", "WARNA BENDERA UNIV", "BENDERA UNIV", "WARNA_BENDERA_UNIVERSITAS", "BENDERA UNIVERSITAS"], 12);
           const rawWarnaBenderaFak = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_FAK", "WARNA BENDERA FAK", "BENDERA FAK", "WARNA_BENDERA_FAKULTAS", "BENDERA FAKULTAS"], 13);
@@ -347,6 +346,9 @@ export default function App() {
                              String(rawBisaRefund || "").trim().toUpperCase() === "YA" || 
                              String(rawBisaRefund || "").trim() === "1";
 
+          const rawWarnaBendera = rawWarnaBenderaUniv || rawWarnaBenderaFak || '';
+          const rawWarnaTali = rawWarnaTaliUniv || rawWarnaTaliFak || '';
+
           return {
             id: orderId,
             clientId: clientId,
@@ -360,6 +362,7 @@ export default function App() {
             gformRow: gformRow,
             parsedData: parseOrderData(orderData),
             linkQr: cleanLink(rawLinkQr),
+            linkClient: cleanLink(rawLinkClient),
             linkProject: cleanLink(rawLinkProject),
             statusQr: rawStatusQr || "",
             statusProject: rawStatusProject || "",

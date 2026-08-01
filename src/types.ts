@@ -32,6 +32,7 @@ export interface Order {
   gformRow: string;    // GFORM_ROW index
   parsedData: ParsedOrderData;
   linkQr?: string;       // LINK_QR
+  linkClient?: string;   // LINK_CLIENT
   linkProject?: string;  // LINK_PROJECT
   statusQr?: string;     // STATUS_QR
   statusProject?: string; // STATUS_PROJECT
