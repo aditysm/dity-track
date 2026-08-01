@@ -259,28 +259,30 @@ app.get("/api/orders", async (req, res) => {
         return s;
       };
       const rawLinkQr = getCellByCol(rObj, rawCells, ["LINK_QR", "QR_LINK", "LINKQR"], 9);
-      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 10);
+      const rawLinkClient = getCellByCol(rObj, rawCells, ["LINK_CLIENT", "CLIENT_LINK", "LINKCLIENT"], 10);
+      const rawLinkProject = getCellByCol(rObj, rawCells, ["LINK_PROJECT", "PROJECT_LINK", "LINKPROJECT"], 11);
       const linkQr = cleanLink(rawLinkQr);
+      const linkClient = cleanLink(rawLinkClient);
       const linkProject = cleanLink(rawLinkProject);
-      const statusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 11);
-      const statusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 12);
+      const statusQr = getCellByCol(rObj, rawCells, ["STATUS_QR", "STATUS QR", "STATUSQR"], 22);
+      const statusProject = getCellByCol(rObj, rawCells, ["STATUS_PROJECT", "STATUS PROJECT", "STATUSPROJECT"], 23);
       const statusOrder = getCellByCol(rObj, rawCells, ["STATUS"], 3) || "DIPROSES";
       const contact = getCellByCol(rObj, rawCells, ["CONTACT"], 2);
       const totalPrice = getCellByCol(rObj, rawCells, ["TOTAL_PRICE"], 4) || "0";
       const createdAt = getCellByCol(rObj, rawCells, ["CREATED_AT"], 5);
       const finishedAt = getCellByCol(rObj, rawCells, ["FINISHED_AT"], 6) || "-";
       const orderData = getCellByCol(rObj, rawCells, ["ORDER_DATA"], 7);
-      const rawWarnaBendera = getCellByCol(rObj, rawCells, ["WARNA_BENDERA", "WARNA BENDERA"], 13);
-      const rawWarnaTali = getCellByCol(rObj, rawCells, ["WARNA_TALI", "WARNA TALI"], 14);
-      const rawWarnaBenderaUniv = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_UNIV", "WARNA BENDERA UNIV", "BENDERA UNIV", "WARNA_BENDERA_UNIVERSITAS", "BENDERA UNIVERSITAS"], 15);
-      const rawWarnaBenderaFak = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_FAK", "WARNA BENDERA FAK", "BENDERA FAK", "WARNA_BENDERA_FAKULTAS", "BENDERA FAKULTAS"], 16);
-      const rawWarnaTaliUniv = getCellByCol(rObj, rawCells, ["WARNA_TALI_UNIV", "WARNA TALI UNIV", "TALI UNIV", "WARNA_TALI_UNIVERSITAS", "TALI UNIVERSITAS"], 17);
-      const rawWarnaTaliFak = getCellByCol(rObj, rawCells, ["WARNA_TALI_FAK", "WARNA TALI FAK", "TALI FAK", "WARNA_TALI_FAKULTAS", "TALI FAKULTAS"], 18);
-      const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 19);
-      const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 20);
-      const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 21);
+      const rawWarnaBenderaUniv = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_UNIV", "WARNA BENDERA UNIV", "BENDERA UNIV", "WARNA_BENDERA_UNIVERSITAS", "BENDERA UNIVERSITAS"], 12);
+      const rawWarnaBenderaFak = getCellByCol(rObj, rawCells, ["WARNA_BENDERA_FAK", "WARNA BENDERA FAK", "BENDERA FAK", "WARNA_BENDERA_FAKULTAS", "BENDERA FAKULTAS"], 13);
+      const rawUkuranCaseUniv = getCellByCol(rObj, rawCells, ["UKURAN_CASE_UNIV", "UKURAN CASE UNIV", "CASE UNIV", "HOLDER UNIV", "UKURAN HOLDER UNIV"], 14);
+      const rawWarnaTaliUniv = getCellByCol(rObj, rawCells, ["WARNA_TALI_UNIV", "WARNA TALI UNIV", "TALI UNIV", "WARNA_TALI_UNIVERSITAS", "TALI UNIVERSITAS"], 15);
+      const rawWarnaTaliFak = getCellByCol(rObj, rawCells, ["WARNA_TALI_FAK", "WARNA TALI FAK", "TALI FAK", "WARNA_TALI_FAKULTAS", "TALI FAKULTAS"], 16);
+      const rawUkuranCaseFak = getCellByCol(rObj, rawCells, ["UKURAN_CASE_FAK", "UKURAN CASE FAK", "CASE FAK", "HOLDER FAK", "UKURAN HOLDER FAK"], 17);
+      const rawBisaRefund = getCellByCol(rObj, rawCells, ["BISA_REFUND", "BISA REFUND", "REFUND", "BISA_PENGEMBALIAN_DANA"], 18);
+      const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS"], 19);
+      const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS"], 20);
+      const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 21);
       const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || String(rawBisaRefund || "").trim().toUpperCase() === "YA" || String(rawBisaRefund || "").trim() === "1";
-      const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 22);
       return {
         ORDER_ID: orderId,
         CLIENT_ID: clientId,
@@ -293,11 +295,12 @@ app.get("/api/orders", async (req, res) => {
         ORDER_DATA: orderData,
         GFORM_ROW: gformRow,
         LINK_QR: linkQr,
+        LINK_CLIENT: linkClient,
         LINK_PROJECT: linkProject,
         STATUS_QR: statusQr,
         STATUS_PROJECT: statusProject,
-        WARNA_BENDERA: rawWarnaBendera,
-        WARNA_TALI: rawWarnaTali,
+        STATUS_UNIV: rawStatusUniv || "",
+        STATUS_FAK: rawStatusFak || "",
         WARNA_BENDERA_UNIV: rawWarnaBenderaUniv,
         WARNA_BENDERA_FAK: rawWarnaBenderaFak,
         WARNA_TALI_UNIV: rawWarnaTaliUniv,
