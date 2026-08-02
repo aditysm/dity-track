@@ -476,6 +476,68 @@ app.post("/api/orders/group", async (req, res) => {
     noKelompok: numericKelompok
   });
 });
+app.get("/api/announcements", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  const SPREADSHEET_ID = (process.env.SPREADSHEET_ID || "1jdwDEOGPDTWyj2buJTUfv-pm0FoBlkcIQ5ofWgHasyU").trim();
+  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("Announcement")}&_t=${Date.now()}`;
+  const FALLBACK_ANNOUNCEMENTS = [
+    { ANN_ID: "ANN-02", PESAN: "Data & dokumenmu dijamin aman!", URUTAN: 1, IS_ACTIVE: true },
+    { ANN_ID: "ANN-03", PESAN: "Harga pelajar, ramah di kantong", URUTAN: 2, IS_ACTIVE: true },
+    { ANN_ID: "ANN-01", PESAN: "Pengerjaan cepat sesuai deadline yang disepakati", URUTAN: 3, IS_ACTIVE: true }
+  ];
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP status ${response.status}`);
+    }
+    const text = await response.text();
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+    if (!match) {
+      throw new Error("Invalid response format from Google Sheets");
+    }
+    const data = JSON.parse(match[1]);
+    if (data.status === "error" || !data.table || !data.table.cols) {
+      throw new Error("Error or empty sheet returned");
+    }
+    const cols = data.table.cols.map((c) => (c.label || c.id || "").toUpperCase().trim());
+    const parsedAnnouncements = (data.table.rows || []).map((r) => {
+      const getColVal = (possibleNames, defaultIdx) => {
+        if (r && r.c) {
+          for (let i = 0; i < cols.length; i++) {
+            if (possibleNames.includes(cols[i])) {
+              const cell = r.c[i];
+              return cell && cell.v !== null && cell.v !== void 0 ? cell.v : "";
+            }
+          }
+          if (r.c[defaultIdx]) {
+            const cell = r.c[defaultIdx];
+            return cell && cell.v !== null && cell.v !== void 0 ? cell.v : "";
+          }
+        }
+        return "";
+      };
+      const annId = String(getColVal(["ANN_ID", "ANN ID", "ID"], 0)).trim();
+      const pesan = String(getColVal(["PESAN", "MESSAGE", "TEXT"], 1)).trim();
+      const urutan = getColVal(["URUTAN", "ORDER"], 2);
+      const isActive = getColVal(["IS_ACTIVE", "IS ACTIVE", "ACTIVE"], 3);
+      return {
+        ANN_ID: annId,
+        PESAN: pesan,
+        URUTAN: urutan,
+        IS_ACTIVE: isActive
+      };
+    }).filter((item) => item.PESAN !== "");
+    if (parsedAnnouncements.length === 0) {
+      return res.json({ success: true, announcements: FALLBACK_ANNOUNCEMENTS });
+    }
+    return res.json({ success: true, announcements: parsedAnnouncements });
+  } catch (err) {
+    console.warn(`[Server] Announcements fetch failed (${err.message}), serving fallback.`);
+    return res.json({ success: true, announcements: FALLBACK_ANNOUNCEMENTS });
+  }
+});
 async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await (0, import_vite.createServer)({
