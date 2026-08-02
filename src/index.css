@@ -7,6 +7,38 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+:root {
+  --ann-height: 32px;
+}
+
+#announcementBar {
+  position: sticky;
+  top: 0;
+  height: var(--ann-height, 32px);
+  z-index: 1001;
+  background: linear-gradient(90deg, #0b1329 0%, #111c38 50%, #0b1329 100%);
+  transition: margin-top 0.5s ease, opacity 0.5s ease, height 0.5s ease;
+}
+
+/* SLIM MARQUEE ANIMATION - Comfortable reading speed */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 44s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 @keyframes scanLaser {
   0% { top: 10%; }
   50% { top: 90%; }

@@ -9,6 +9,7 @@ import OrderDetail from './components/OrderDetail';
 import PolicyPage from './components/PolicyPage';
 import PrivacyPage from './components/PrivacyPage';
 import ScannerAdmin from './components/ScannerAdmin';
+import AnnouncementBar from './components/AnnouncementBar';
 
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
@@ -736,9 +737,12 @@ export default function App() {
         </AnimatePresence>
       </div>
 
+      {/* Announcement Bar at the very top */}
+      <AnnouncementBar />
+
       {/* Top Banner Navigation Bar */}
       <header 
-        className="w-full bg-white/80 backdrop-blur-md border-b border-blue-100/50 sticky top-0 z-50 px-4 md:px-8 py-4 flex items-center justify-between"
+        className="w-full bg-white/80 backdrop-blur-md border-b border-blue-100/50 sticky top-[var(--ann-height,0px)] z-50 px-4 md:px-8 py-4 flex items-center justify-between transition-[top] duration-500"
         id="app-header"
       >
         <button 
