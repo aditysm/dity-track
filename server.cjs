@@ -282,6 +282,7 @@ app.get("/api/orders", async (req, res) => {
       const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS"], 19);
       const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS"], 20);
       const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 21);
+      const rawTanggalPengambilan = getCellByCol(rObj, rawCells, ["TANGGAL_PENGAMBILAN", "TANGGAL PENGAMBILAN", "TGL_PENGAMBILAN", "TGL PENGAMBILAN", "PICKUP_DATE", "TANGGAL"], 22);
       const bisaRefund = String(rawBisaRefund || "").trim().toUpperCase() === "TRUE" || String(rawBisaRefund || "").trim().toUpperCase() === "YA" || String(rawBisaRefund || "").trim() === "1";
       return {
         ORDER_ID: orderId,
@@ -308,7 +309,8 @@ app.get("/api/orders", async (req, res) => {
         UKURAN_CASE_UNIV: rawUkuranCaseUniv,
         UKURAN_CASE_FAK: rawUkuranCaseFak,
         BISA_REFUND: bisaRefund,
-        NO_KELOMPOK: rawNoKelompok ? String(rawNoKelompok).trim() : ""
+        NO_KELOMPOK: rawNoKelompok ? String(rawNoKelompok).trim() : "",
+        TANGGAL_PENGAMBILAN: rawTanggalPengambilan || "2026-08-04"
       };
     }).filter((order) => order.ORDER_ID !== "" && order.ORDER_ID !== "ORDER_ID");
     return res.json({
