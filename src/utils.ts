@@ -249,3 +249,37 @@ export function formatPickupDate(dateStr?: string, includeDayName = false): stri
   return `${dateNum} ${monthName} ${yr}`;
 }
 
+/**
+ * Flexible matching for order invoice IDs.
+ * Allows searching by full ID ("INV-20260720-01"), without "INV" prefix ("20260720-01"),
+ * or by suffix digits ("01", "0720-01", "2026072001").
+ */
+export function isInvoiceMatch(orderId: string, searchInput: string): boolean {
+  if (!orderId || !searchInput) return false;
+  const cleanId = orderId.trim().toLowerCase();
+  const cleanInput = searchInput.trim().toLowerCase();
+
+  if (cleanId === cleanInput) return true;
+
+  const normId = cleanId.replace(/^inv[:\-\s]*/i, '');
+  const normInput = cleanInput.replace(/^inv[:\-\s]*/i, '');
+
+  if (normId === normInput) return true;
+
+  if (cleanId.endsWith(cleanInput) || normId.endsWith(normInput)) return true;
+
+  if (cleanId.includes(cleanInput) || normId.includes(normInput)) return true;
+
+  // Compare purely alphanumeric characters (ignoring hyphens, spaces)
+  const alphaNumId = cleanId.replace(/[^a-z0-9]/g, '');
+  const alphaNumInput = cleanInput.replace(/[^a-z0-9]/g, '');
+
+  if (alphaNumInput.length > 0) {
+    if (alphaNumId === alphaNumInput || alphaNumId.endsWith(alphaNumInput) || alphaNumId.includes(alphaNumInput)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, Database, Sparkles, HelpCircle, X, Contact, Copy, Check, Code, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Order } from './types';
-import { parseOrderData } from './utils';
+import { parseOrderData, isInvoiceMatch } from './utils';
 import LandingPage from './components/LandingPage';
 import SearchResults from './components/SearchResults';
 import OrderDetail from './components/OrderDetail';
@@ -466,22 +466,16 @@ export default function App() {
   const urlSearchQuery = useMemo(() => searchParams.get('query') || '', [searchParams]);
   const urlSelectedOrderId = useMemo(() => searchParams.get('id') || '', [searchParams]);
 
-  // Filter orders based on query parameter (supports trim, optional INV- / INV: / INV prefix, optional @gmail.com suffix)
+  // Filter orders based on query parameter (supports full ID, without INV, suffix digits, email, contact, name, IG)
   const filteredOrders = useMemo(() => {
     const rawQuery = urlSearchQuery.trim();
     if (!rawQuery) return [];
     
     const cleanQuery = rawQuery.toLowerCase();
-    const queryInvNormalized = cleanQuery.replace(/^inv[:\-\s]*/i, '');
     const queryEmailUser = cleanQuery.replace(/@.*$/, '');
 
     return orders.filter(order => {
-      const oIdClean = order.id.trim().toLowerCase();
-      const oIdNormalized = oIdClean.replace(/^inv[:\-\s]*/i, '');
-      const matchId = 
-        oIdClean === cleanQuery || 
-        (queryInvNormalized.length > 0 && oIdNormalized === queryInvNormalized) ||
-        (queryInvNormalized.length >= 3 && (oIdClean.includes(queryInvNormalized) || oIdNormalized.includes(queryInvNormalized)));
+      const matchId = isInvoiceMatch(order.id, rawQuery);
 
       const oEmailClean = order.clientId.trim().toLowerCase();
       const oEmailUser = oEmailClean.replace(/@.*$/, '');
@@ -499,22 +493,19 @@ export default function App() {
     });
   }, [urlSearchQuery, orders]);
 
-  // Find selected order based on id parameter (supports trim, optional INV- / INV: / INV prefix, optional @gmail.com suffix)
+  // Find selected order based on id parameter (supports flexible invoice matching)
   const selectedOrder = useMemo(() => {
     if (!urlSelectedOrderId) return null;
-    const cleanQuery = urlSelectedOrderId.trim().toLowerCase();
-    const queryInvNormalized = cleanQuery.replace(/^inv[:\-\s]*/i, '');
+    const rawQuery = urlSelectedOrderId.trim();
+    const cleanQuery = rawQuery.toLowerCase();
     const queryEmailUser = cleanQuery.replace(/@.*$/, '');
 
     let found = orders.find(o => {
-      const oIdClean = o.id.trim().toLowerCase();
-      const oIdNormalized = oIdClean.replace(/^inv[:\-\s]*/i, '');
+      const matchId = isInvoiceMatch(o.id, rawQuery);
       const oEmailClean = o.clientId.trim().toLowerCase();
       const oEmailUser = oEmailClean.replace(/@.*$/, '');
 
-      return oIdClean === cleanQuery || 
-             (queryInvNormalized.length > 0 && oIdNormalized === queryInvNormalized) || 
-             (queryInvNormalized.length >= 3 && oIdNormalized.includes(queryInvNormalized)) ||
+      return matchId || 
              oEmailClean === cleanQuery || 
              (queryEmailUser.length > 0 && oEmailUser === queryEmailUser);
     });

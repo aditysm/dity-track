@@ -617,7 +617,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                           <span>Kelompok Saya</span>
                         </div>
                         <p className="text-[11px] text-indigo-700/80 font-medium">
-                          {savedGroup ? `Kelompok ${savedGroup}` : 'Belum diatur (opsional)'}
+                          {savedGroup ? `Kelompok ${savedGroup}` : 'Belum diatur'}
                         </p>
                       </div>
 
