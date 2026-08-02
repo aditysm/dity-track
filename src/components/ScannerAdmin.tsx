@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
-import { Camera, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertCircle, RefreshCw, Search, ShieldCheck, Award, Building2, X, Fingerprint, Smartphone } from 'lucide-react';
+import { Camera, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertCircle, RefreshCw, Search, ShieldCheck, Award, Building2, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Order } from '../types';
 import { isInvoiceMatch } from '../utils';
@@ -24,85 +24,6 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
     sessionStorage.removeItem('dity_admin_auth');
     setIsAuthenticated(false);
   }, []);
-
-  // Biometric Auth State
-  const [isBiometricScanning, setIsBiometricScanning] = useState(false);
-  const [biometricStatus, setBiometricStatus] = useState('');
-  const [biometricSuccess, setBiometricSuccess] = useState(false);
-
-  // Handle Biometric / Fingerprint login (WebAuthn / Native Device Lock prompt)
-  const handleBiometricAuth = async () => {
-    setIsBiometricScanning(true);
-    setBiometricStatus('Mengakses Kunci Perangkat / Sidik Jari HP...');
-    setBiometricSuccess(false);
-    setAuthError('');
-
-    let webAuthnSuccess = false;
-
-    // Try Native WebAuthn Device Lock / Biometric Prompt first
-    if (window.PublicKeyCredential && typeof navigator.credentials?.get === 'function') {
-      try {
-        const challenge = new Uint8Array(32);
-        window.crypto.getRandomValues(challenge);
-
-        const options: CredentialRequestOptions = {
-          publicKey: {
-            challenge: challenge,
-            timeout: 60000,
-            userVerification: "required",
-            rpId: window.location.hostname
-          }
-        };
-
-        const credential = await navigator.credentials.get(options);
-        if (credential) {
-          webAuthnSuccess = true;
-        }
-      } catch (e: any) {
-        console.warn('WebAuthn prompt error/cancelled:', e);
-        // If user actively cancelled native screen lock prompt
-        if (e.name === 'NotAllowedError' || e.name === 'AbortError') {
-          setIsBiometricScanning(false);
-          setAuthError('Verifikasi sidik jari/kunci layar dibatalkan.');
-          return;
-        }
-      }
-    }
-
-    if (webAuthnSuccess) {
-      setBiometricStatus('Verifikasi Biometrik Berhasil!');
-      setBiometricSuccess(true);
-      setTimeout(() => {
-        setIsBiometricScanning(false);
-        sessionStorage.setItem('dity_admin_auth', 'true');
-        localStorage.setItem('dity_biometric_enabled', 'true');
-        setIsAuthenticated(true);
-        onShowToast?.("Akses Admin berhasil dibuka via Sidik Jari!", "success");
-      }, 600);
-    } else {
-      // Fallback: Require explicit user touch on the sensor button in modal (never auto-verify)
-      setBiometricStatus('Tempelkan jari Anda pada sensor di bawah');
-    }
-  };
-
-  // User manually taps the fingerprint sensor inside the modal to complete verification
-  const handleManualSensorTouch = () => {
-    setBiometricStatus('Memeriksa Sidik Jari...');
-    setBiometricSuccess(false);
-
-    setTimeout(() => {
-      setBiometricStatus('Verifikasi Sidik Jari Berhasil!');
-      setBiometricSuccess(true);
-
-      setTimeout(() => {
-        setIsBiometricScanning(false);
-        sessionStorage.setItem('dity_admin_auth', 'true');
-        localStorage.setItem('dity_biometric_enabled', 'true');
-        setIsAuthenticated(true);
-        onShowToast?.("Akses Admin berhasil dibuka via Sidik Jari!", "success");
-      }, 600);
-    }, 800);
-  };
 
   // Scanner & Claim State
   const [scannedOrder, setScannedOrder] = useState<string | null>(null);
@@ -347,8 +268,6 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
     return (
       <div className="max-w-md mx-auto px-4 py-10" id="scanner-admin-login">
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 md:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
-
           <button
             onClick={onBack}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors mb-6 cursor-pointer"
@@ -404,60 +323,6 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
               <span>Masuk ke Scanner</span>
             </button>
           </form>
-
-          {/* Divider */}
-          <div className="relative my-5 flex items-center justify-center">
-            <div className="border-t border-slate-200 w-full"></div>
-            <span className="bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider relative z-10 shrink-0">Atau</span>
-          </div>
-
-          {/* Fingerprint / Biometric Login Button */}
-          <button
-            type="button"
-            onClick={handleBiometricAuth}
-            className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] text-emerald-800 font-bold text-xs md:text-sm rounded-xl border border-emerald-200/90 shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-2.5"
-            id="btn-login-fingerprint"
-          >
-            <Fingerprint className="w-5 h-5 text-emerald-600 shrink-0 animate-pulse" />
-            <span>Masuk via Sidik Jari HP</span>
-          </button>
-
-          <p className="text-[10.5px] text-slate-400 text-center mt-3 flex items-center justify-center gap-1">
-            <Smartphone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>Mendukung verifikasi sidik jari di HP Android & iOS</span>
-          </p>
-
-          {/* Biometric Fingerprint Scanning Modal */}
-          {isBiometricScanning && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl border border-slate-200 p-6 max-w-xs w-full text-center space-y-4 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500"></div>
-                
-                <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                  <div className={`absolute inset-0 rounded-full ${biometricSuccess ? 'bg-emerald-100 animate-ping' : 'bg-emerald-100/60 animate-pulse'}`}></div>
-                  <div className={`relative w-16 h-16 rounded-full flex items-center justify-center border-2 ${biometricSuccess ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-600/30'}`}>
-                    {biometricSuccess ? <CheckCircle2 className="w-8 h-8" /> : <Fingerprint className="w-9 h-9 animate-bounce" />}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-display font-bold text-slate-800">Verifikasi Sidik Jari</h3>
-                  <p className="text-xs font-semibold text-emerald-700 mt-1">{biometricStatus}</p>
-                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                    Sentuhkan jari Anda pada sensor sidik jari perangkat untuk verifikasi keamanan.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsBiometricScanning(false)}
-                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
