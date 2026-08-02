@@ -138,6 +138,8 @@ export default function App() {
             linkProject: o.LINK_PROJECT || '',
             statusQr: o.STATUS_QR || '',
             statusProject: o.STATUS_PROJECT || '',
+            statusUniv: o.STATUS_UNIV || '',
+            statusFak: o.STATUS_FAK || '',
             warnaBendera: o.WARNA_BENDERA || '',
             warnaTali: o.WARNA_TALI || '',
             warnaBenderaUniv: o.WARNA_BENDERA_UNIV || '',
@@ -147,7 +149,8 @@ export default function App() {
             ukuranCaseUniv: o.UKURAN_CASE_UNIV || '',
             ukuranCaseFak: o.UKURAN_CASE_FAK || '',
             bisaRefund: !!o.BISA_REFUND,
-            noKelompok: noKelompokClean
+            noKelompok: noKelompokClean,
+            tanggalPengambilan: o.TANGGAL_PENGAMBILAN || '2026-08-04'
           };
         });
         
@@ -338,6 +341,7 @@ export default function App() {
           const rawStatusUniv = getCellByCol(rObj, rawCells, ["STATUS_UNIV", "STATUS UNIV", "STATUS_UNIVERSITAS", "STATUS UNIVERSITAS", "SERAH_TERIMA_UNIV", "DIAMBIL_UNIV", "TAKEN_UNIV", "STATUS TAKEN UNIV"], 19);
           const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS", "SERAH_TERIMA_FAK", "DIAMBIL_FAK", "TAKEN_FAK", "STATUS TAKEN FAK"], 20);
           const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 21);
+          const rawTanggalPengambilan = getCellByCol(rObj, rawCells, ["TANGGAL_PENGAMBILAN", "TANGGAL PENGAMBILAN", "TGL_PENGAMBILAN", "TGL PENGAMBILAN", "PICKUP_DATE", "TANGGAL"], 22);
           const noKelompokClean = rawNoKelompok ? String(rawNoKelompok).replace(/[^0-9]/g, '').trim() : '';
           if (orderId) {
             localStorage.setItem(`group_${orderId}`, noKelompokClean);
@@ -377,7 +381,8 @@ export default function App() {
             ukuranCaseUniv: rawUkuranCaseUniv,
             ukuranCaseFak: rawUkuranCaseFak,
             bisaRefund: bisaRefund,
-            noKelompok: noKelompokClean
+            noKelompok: noKelompokClean,
+            tanggalPengambilan: rawTanggalPengambilan ? String(rawTanggalPengambilan).trim() : '2026-08-04'
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         
@@ -461,31 +466,58 @@ export default function App() {
   const urlSearchQuery = useMemo(() => searchParams.get('query') || '', [searchParams]);
   const urlSelectedOrderId = useMemo(() => searchParams.get('id') || '', [searchParams]);
 
-  // Filter orders based on query parameter (exact matching for full ID or full Email)
+  // Filter orders based on query parameter (supports trim, optional INV- / INV: / INV prefix, optional @gmail.com suffix)
   const filteredOrders = useMemo(() => {
-    if (!urlSearchQuery.trim()) return [];
+    const rawQuery = urlSearchQuery.trim();
+    if (!rawQuery) return [];
     
-    const cleanQuery = urlSearchQuery.trim().toLowerCase();
+    const cleanQuery = rawQuery.toLowerCase();
+    const queryInvNormalized = cleanQuery.replace(/^inv[:\-\s]*/i, '');
+    const queryEmailUser = cleanQuery.replace(/@.*$/, '');
+
     return orders.filter(order => {
-      const matchId = order.id.trim().toLowerCase() === cleanQuery;
-      const matchEmail = order.clientId.trim().toLowerCase() === cleanQuery;
-      const matchContact = order.contact ? order.contact.trim().toLowerCase() === cleanQuery : false;
-      const matchName = order.clientName ? order.clientName.trim().toLowerCase() === cleanQuery : false;
+      const oIdClean = order.id.trim().toLowerCase();
+      const oIdNormalized = oIdClean.replace(/^inv[:\-\s]*/i, '');
+      const matchId = 
+        oIdClean === cleanQuery || 
+        (queryInvNormalized.length > 0 && oIdNormalized === queryInvNormalized) ||
+        (queryInvNormalized.length >= 3 && (oIdClean.includes(queryInvNormalized) || oIdNormalized.includes(queryInvNormalized)));
+
+      const oEmailClean = order.clientId.trim().toLowerCase();
+      const oEmailUser = oEmailClean.replace(/@.*$/, '');
+      const matchEmail = 
+        oEmailClean === cleanQuery || 
+        (queryEmailUser.length > 0 && (oEmailUser === queryEmailUser || oEmailClean.includes(queryEmailUser)));
+
+      const matchContact = order.contact ? order.contact.trim().toLowerCase() === cleanQuery || order.contact.trim().toLowerCase().includes(cleanQuery) : false;
+      const matchName = order.clientName ? order.clientName.trim().toLowerCase().includes(cleanQuery) : false;
       const cleanQueryNoAt = cleanQuery.replace(/^@+/, '');
       const orderIgNoAt = order.parsedData?.ig ? order.parsedData.ig.trim().toLowerCase().replace(/^@+/, '') : '';
-      const matchIg = orderIgNoAt ? orderIgNoAt === cleanQueryNoAt : false;
+      const matchIg = orderIgNoAt ? orderIgNoAt === cleanQueryNoAt || orderIgNoAt.includes(cleanQueryNoAt) : false;
 
       return matchId || matchEmail || matchContact || matchName || matchIg;
     });
   }, [urlSearchQuery, orders]);
 
-  // Find selected order based on id parameter
+  // Find selected order based on id parameter (supports trim, optional INV- / INV: / INV prefix, optional @gmail.com suffix)
   const selectedOrder = useMemo(() => {
     if (!urlSelectedOrderId) return null;
-    const cleanId = urlSelectedOrderId.trim().toLowerCase();
-    
-    // Exact invoice id match or exact email match
-    let found = orders.find(o => o.id.trim().toLowerCase() === cleanId || o.clientId.trim().toLowerCase() === cleanId);
+    const cleanQuery = urlSelectedOrderId.trim().toLowerCase();
+    const queryInvNormalized = cleanQuery.replace(/^inv[:\-\s]*/i, '');
+    const queryEmailUser = cleanQuery.replace(/@.*$/, '');
+
+    let found = orders.find(o => {
+      const oIdClean = o.id.trim().toLowerCase();
+      const oIdNormalized = oIdClean.replace(/^inv[:\-\s]*/i, '');
+      const oEmailClean = o.clientId.trim().toLowerCase();
+      const oEmailUser = oEmailClean.replace(/@.*$/, '');
+
+      return oIdClean === cleanQuery || 
+             (queryInvNormalized.length > 0 && oIdNormalized === queryInvNormalized) || 
+             (queryInvNormalized.length >= 3 && oIdNormalized.includes(queryInvNormalized)) ||
+             oEmailClean === cleanQuery || 
+             (queryEmailUser.length > 0 && oEmailUser === queryEmailUser);
+    });
     return found || null;
   }, [urlSelectedOrderId, orders]);
 

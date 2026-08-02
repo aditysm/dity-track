@@ -178,3 +178,74 @@ export function formatDateTime(dateTimeStr: string): string {
     return dateTimeStr;
   }
 }
+
+/**
+ * Formats date string (e.g. "2026-08-04" or "04/08/2026") into Indonesian date format.
+ * If includeDayName is true: "Selasa, 04 Agustus 2026"
+ * If includeDayName is false: "04 Agustus 2026"
+ */
+export function formatPickupDate(dateStr?: string, includeDayName = false): string {
+  if (!dateStr || String(dateStr).trim() === '' || String(dateStr).trim() === '-') {
+    dateStr = '2026-08-04';
+  }
+
+  const cleanStr = String(dateStr).trim();
+  let year = 2026;
+  let monthIdx = 7; // August (0-indexed: 0=Jan, 7=Aug)
+  let day = 4;
+  let parsedSuccess = false;
+
+  // Pattern 1: Google Sheets gviz format "Date(2026,7,4)" or "Date(2026, 7, 4)"
+  const gvizMatch = cleanStr.match(/Date\s*\(\s*(\d{4})\s*,\s*(\d{1,2})\s*,\s*(\d{1,2})\s*\)/i);
+  if (gvizMatch) {
+    year = parseInt(gvizMatch[1], 10);
+    monthIdx = parseInt(gvizMatch[2], 10); // In gviz, 7 is August (0-indexed month)
+    day = parseInt(gvizMatch[3], 10);
+    parsedSuccess = true;
+  } else {
+    // Pattern 2: YYYY-MM-DD or YYYY/MM/DD
+    const isoMatch = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+      year = parseInt(isoMatch[1], 10);
+      monthIdx = parseInt(isoMatch[2], 10) - 1; // 1-indexed to 0-indexed
+      day = parseInt(isoMatch[3], 10);
+      parsedSuccess = true;
+    } else {
+      // Pattern 3: DD-MM-YYYY or DD/MM/YYYY
+      const ddmmyyyyMatch = cleanStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (ddmmyyyyMatch) {
+        day = parseInt(ddmmyyyyMatch[1], 10);
+        monthIdx = parseInt(ddmmyyyyMatch[2], 10) - 1;
+        year = parseInt(ddmmyyyyMatch[3], 10);
+        parsedSuccess = true;
+      } else {
+        const d = new Date(cleanStr);
+        if (!isNaN(d.getTime())) {
+          year = d.getFullYear();
+          monthIdx = d.getMonth();
+          day = d.getDate();
+          parsedSuccess = true;
+        }
+      }
+    }
+  }
+
+  const d = parsedSuccess ? new Date(year, monthIdx, day) : new Date(2026, 7, 4);
+
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  const dayName = days[d.getDay()];
+  const dateNum = String(d.getDate()).padStart(2, '0');
+  const monthName = months[d.getMonth()];
+  const yr = d.getFullYear();
+
+  if (includeDayName) {
+    return `${dayName}, ${dateNum} ${monthName} ${yr}`;
+  }
+  return `${dateNum} ${monthName} ${yr}`;
+}
+

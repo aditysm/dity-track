@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users, Clock
 } from 'lucide-react';
 import { Order } from '../types';
-import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername } from '../utils';
+import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername, formatPickupDate } from '../utils';
 
 interface OrderDetailProps {
   order: Order;
@@ -36,6 +36,32 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
   const [showPickupQrPopup, setShowPickupQrPopup] = useState(false);
+  const [showPickupTimeModal, setShowPickupTimeModal] = useState(false);
+  const [selectedPickupTime, setSelectedPickupTime] = useState('');
+  const [pickupTimeError, setPickupTimeError] = useState('');
+
+  const validatePickupTime = (timeStr: string): { isValid: boolean; errorMsg: string } => {
+    if (!timeStr || !timeStr.trim()) {
+      return { isValid: false, errorMsg: 'Silahkan pilih jam pengambilan (09:00 - 18:00 WITA).' };
+    }
+    const parts = timeStr.trim().split(':');
+    if (parts.length < 2) {
+      return { isValid: false, errorMsg: 'Format jam tidak valid.' };
+    }
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) {
+      return { isValid: false, errorMsg: 'Format jam tidak valid.' };
+    }
+    if (h < 9) {
+      return { isValid: false, errorMsg: 'Jam pengambilan tidak boleh kurang dari jam 09:00 pagi WITA.' };
+    }
+    if (h > 18 || (h === 18 && m > 0)) {
+      return { isValid: false, errorMsg: 'Jam pengambilan tidak boleh lebih dari jam 18:00 sore WITA.' };
+    }
+    return { isValid: true, errorMsg: '' };
+  };
+
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundTermsAccepted, setRefundTermsAccepted] = useState(false);
   const [refundReason, setRefundReason] = useState('');
@@ -51,6 +77,104 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   useEffect(() => {
     setSavedGroup(cleanNoKelompokStr(order.noKelompok) || localStorage.getItem(`group_${order.id}`) || '');
   }, [order.noKelompok, order.id]);
+
+  const formatIndonesianTakenTimestamp = (rawStr: string): string | null => {
+    if (!rawStr) return null;
+    const timeMatch = rawStr.match(/\(([^)]+)\)/);
+    const targetStr = timeMatch ? timeMatch[1].trim() : rawStr.replace(/^(SUDAH\s+)?DIAMBIL\s*:?\s*/i, '').trim();
+    
+    if (!targetStr || targetStr.toUpperCase() === 'DIAMBIL' || targetStr.toUpperCase() === 'SUDAH DIAMBIL' || targetStr.toUpperCase() === 'SELESAI' || targetStr === '-') {
+      return null;
+    }
+
+    const dateMatch = targetStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (dateMatch) {
+      const [_, yStr, mStr, dStr, hrStr, minStr, secStr] = dateMatch;
+      const year = parseInt(yStr, 10);
+      const month = parseInt(mStr, 10) - 1;
+      const day = parseInt(dStr, 10);
+      const hours = hrStr ? parseInt(hrStr, 10) : 0;
+      const minutes = minStr ? parseInt(minStr, 10) : 0;
+      const seconds = secStr ? parseInt(secStr, 10) : 0;
+
+      const dateObj = new Date(year, month, day, hours, minutes, seconds);
+      const daysIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+      const dayName = daysIndo[dateObj.getDay()];
+      const dayNum = String(day).padStart(2, '0');
+      const monthName = monthsIndo[month];
+      
+      if (hrStr && minStr) {
+        const hh = String(hours).padStart(2, '0');
+        const mm = String(minutes).padStart(2, '0');
+        const ss = secStr ? `:${String(seconds).padStart(2, '0')}` : '';
+        return `Diambil pada ${dayName}, ${dayNum} ${monthName} ${year}, pukul ${hh}:${mm}${ss} WITA`;
+      } else {
+        return `Diambil pada ${dayName}, ${dayNum} ${monthName} ${year}`;
+      }
+    }
+
+    if (targetStr.toLowerCase().includes('pada')) {
+      return targetStr;
+    }
+
+    return `Diambil pada ${targetStr}`;
+  };
+
+  const parseSubCardStatus = (statusStr?: string, defaultFallback?: string): { 
+    type: 'DIPROSES' | 'DIKERJAKAN' | 'DIBUAT' | 'SIAP_DIAMBIL' | 'SUDAH_DIAMBIL' | 'DIBATALKAN'; 
+    label: string;
+    takenAtText?: string | null;
+  } => {
+    const raw = (statusStr && statusStr.trim() !== '' && statusStr.trim() !== '-') 
+      ? statusStr.trim() 
+      : (defaultFallback && defaultFallback.trim() !== '' && defaultFallback.trim() !== '-' ? defaultFallback.trim() : 'DIKERJAKAN');
+    
+    const s = raw.toUpperCase();
+    if (s.includes('SIAP DIAMBIL')) {
+      return { type: 'SIAP_DIAMBIL', label: 'SIAP DIAMBIL' };
+    }
+    if (s.includes('DIAMBIL') || s.includes('SELESAI')) {
+      const takenAtText = formatIndonesianTakenTimestamp(raw);
+      return { type: 'SUDAH_DIAMBIL', label: 'SUDAH DIAMBIL', takenAtText };
+    }
+    if (s.includes('BATAL')) {
+      return { type: 'DIBATALKAN', label: 'DIBATALKAN' };
+    }
+    if (s.includes('DIBUAT')) {
+      return { type: 'DIBUAT', label: 'DIBUAT' };
+    }
+    if (s.includes('DIKERJAKAN')) {
+      return { type: 'DIKERJAKAN', label: 'DIKERJAKAN' };
+    }
+    return { type: 'DIPROSES', label: 'DIPROSES' };
+  };
+
+  const renderStatusBadgeFromParsed = (parsed: { type: string; label: string } | null) => {
+    if (!parsed) return null;
+    const { type } = parsed;
+    if (type === 'SUDAH_DIAMBIL') {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+          SUDAH DIAMBIL
+        </span>
+      );
+    }
+    if (type === 'SIAP_DIAMBIL') {
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">SIAP DIAMBIL</span>;
+    }
+    if (type === 'DIBATALKAN') {
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 shadow-2xs">DIBATALKAN</span>;
+    }
+    if (type === 'DIBUAT') {
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs">DIBUAT</span>;
+    }
+    if (type === 'DIKERJAKAN') {
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs">DIKERJAKAN</span>;
+    }
+    return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">DIPROSES</span>;
+  };
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(order.id);
@@ -71,6 +195,42 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
     return url;
   };
 
+  // Univ Card Specs
+  const benderaUnivVal = order.warnaBenderaUniv || order.parsedData?.warnaBenderaUniv || '';
+  const taliUnivVal = order.warnaTaliUniv || order.parsedData?.warnaTaliUniv || '';
+  const caseUnivVal = (order.ukuranCaseUniv && order.ukuranCaseUniv !== '-') 
+    ? order.ukuranCaseUniv 
+    : (order.parsedData?.ukuranCaseUniv && order.parsedData.ukuranCaseUniv !== '-')
+      ? order.parsedData.ukuranCaseUniv 
+      : 'B4';
+  const showUnivCard = (benderaUnivVal.trim() !== '' && benderaUnivVal.trim() !== '-') || 
+                       (taliUnivVal.trim() !== '' && taliUnivVal.trim() !== '-');
+
+  // Fak Card Specs
+  const benderaFakVal = order.warnaBenderaFak || order.parsedData?.warnaBenderaFak || '';
+  const taliFakVal = order.warnaTaliFak || order.parsedData?.warnaTaliFak || '';
+  const caseFakVal = (order.ukuranCaseFak && order.ukuranCaseFak !== '-') 
+    ? order.ukuranCaseFak 
+    : (order.parsedData?.ukuranCaseFak && order.parsedData.ukuranCaseFak !== '-')
+      ? order.parsedData.ukuranCaseFak 
+      : 'B2';
+  const showFakCard = (benderaFakVal.trim() !== '' && benderaFakVal.trim() !== '-') || 
+                      (taliFakVal.trim() !== '' && taliFakVal.trim() !== '-');
+
+  const hasBothCards = showUnivCard && showFakCard;
+
+  const univParsed = showUnivCard
+    ? parseSubCardStatus(order.statusUniv, 'DIKERJAKAN')
+    : null;
+
+  const fakParsed = showFakCard
+    ? parseSubCardStatus(order.statusFak, 'DIKERJAKAN')
+    : null;
+
+  const legacyParsed = (!showUnivCard && !showFakCard)
+    ? parseSubCardStatus(order.status, 'DIKERJAKAN')
+    : null;
+
   const getStatusStepIndex = (status: Order['status']): number => {
     switch (status) {
       case 'DIPROSES': return 0;
@@ -82,8 +242,19 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
     }
   };
 
+  // Status utama (order.status) HANYA mempengaruhi Tahapan Progres Pesanan (Stepper timeline)
   const currentStepIndex = getStatusStepIndex(order.status);
   const isCancelled = order.status === 'DIBATALKAN';
+  const isSiapDiambil = order.status === 'SIAP DIAMBIL';
+
+  // Status per ID Card (Univ / Fak) mempengaruhi Sticky Bottom Bar & Pratinjau Desain & Spesifikasi
+  const isAnyCardReadyForPickup = (univParsed?.type === 'SIAP_DIAMBIL') || 
+                                  (fakParsed?.type === 'SIAP_DIAMBIL') || 
+                                  (legacyParsed?.type === 'SIAP_DIAMBIL');
+  const isAllCardsReadyForPickup = isAnyCardReadyForPickup;
+  const showStickyBottom = !isCancelled;
+
+  const hasGroup = !!(savedGroup && savedGroup.trim() !== '');
 
   // Support WhatsApp message
   const supportWaNumber = "62895634048237"; // Can be dynamic or default
@@ -110,7 +281,9 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
     },
     {
       title: 'Siap Diambil',
-      desc: 'Produksi cetak ID Card selesai dilakukan. Pesanan siap diambil atau dikirim.',
+      desc: isSiapDiambil 
+        ? `Silahkan mengambil pesanan pada: ${formatPickupDate(order.tanggalPengambilan, true)}, hubungi admin untuk jam pastinya.`
+        : 'Produksi cetak ID Card selesai dilakukan. Pesanan siap diambil atau dikirim.',
       statusKey: 'SIAP DIAMBIL'
     },
     {
@@ -120,33 +293,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
     }
   ];
 
-  const hasIg = !!(order.parsedData.ig && order.parsedData.ig !== '-');
-  const isDikerjakan = order.status === 'DIKERJAKAN' || order.status === 'DIBUAT';
-  const showStickyBottom = isDikerjakan;
-
-  // Univ Card Specs
-  const benderaUnivVal = order.warnaBenderaUniv || order.parsedData?.warnaBenderaUniv || '';
-  const taliUnivVal = order.warnaTaliUniv || order.parsedData?.warnaTaliUniv || '';
-  const caseUnivVal = (order.ukuranCaseUniv && order.ukuranCaseUniv !== '-') 
-    ? order.ukuranCaseUniv 
-    : (order.parsedData?.ukuranCaseUniv && order.parsedData.ukuranCaseUniv !== '-')
-      ? order.parsedData.ukuranCaseUniv 
-      : 'B4';
-  const showUnivCard = (benderaUnivVal.trim() !== '' && benderaUnivVal.trim() !== '-') || 
-                       (taliUnivVal.trim() !== '' && taliUnivVal.trim() !== '-');
-
-  // Fak Card Specs
-  const benderaFakVal = order.warnaBenderaFak || order.parsedData?.warnaBenderaFak || '';
-  const taliFakVal = order.warnaTaliFak || order.parsedData?.warnaTaliFak || '';
-  const caseFakVal = (order.ukuranCaseFak && order.ukuranCaseFak !== '-') 
-    ? order.ukuranCaseFak 
-    : (order.parsedData?.ukuranCaseFak && order.parsedData.ukuranCaseFak !== '-')
-      ? order.parsedData.ukuranCaseFak 
-      : 'B2';
-  const showFakCard = (benderaFakVal.trim() !== '' && benderaFakVal.trim() !== '-') || 
-                      (taliFakVal.trim() !== '' && taliFakVal.trim() !== '-');
-
-  const hasBothCards = showUnivCard && showFakCard;
+  const hasIg = !!(order.parsedData?.ig && order.parsedData.ig !== '-');
 
   // Legacy fallback
   const legacyBendera = (order.warnaBendera && order.warnaBendera !== '-')
@@ -335,68 +482,6 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                         }`}>
                           {step.desc}
                         </p>
-
-                        {step.statusKey === 'SIAP DIAMBIL' && (order.status || '').trim().toUpperCase() === 'SIAP DIAMBIL' && (
-                          <div className="pt-2.5">
-                            <button
-                              type="button"
-                              onClick={() => setShowPickupQrPopup(true)}
-                              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-                              id="btn-show-pickup-qr"
-                            >
-                              <QrCode className="w-4 h-4" />
-                              <span>Tampilkan QR Pengambilan</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {step.statusKey === 'DIKERJAKAN' && showUnivCard && ((order.status || '').trim().toUpperCase() === 'DIPROSES' || (order.status || '').trim().toUpperCase() === 'DIKERJAKAN') && (
-                          <div className="pt-2.5 flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setGroupInput(savedGroup);
-                                setIsConfirmingGroup(false);
-                                setShowGroupPopup(true);
-                              }}
-                              className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
-                              id="btn-set-group-dikerjakan"
-                            >
-                              <Users className="w-4 h-4" />
-                              <span>Atur Kelompok Saya</span>
-                            </button>
-                            {savedGroup && (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] font-semibold text-indigo-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                <span>Kelompok: {savedGroup}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {step.statusKey === 'DIBUAT' && showUnivCard && (order.status || '').trim().toUpperCase() === 'DIBUAT' && (
-                          <div className="pt-2.5 flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setGroupInput(savedGroup);
-                                setIsConfirmingGroup(false);
-                                setShowGroupPopup(true);
-                              }}
-                              className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
-                              id="btn-set-group-dibuat"
-                            >
-                              <Users className="w-4 h-4" />
-                              <span>Atur Kelompok Saya</span>
-                            </button>
-                            {savedGroup && (
-                              <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] font-semibold text-indigo-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                <span>Kelompok: {savedGroup}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
@@ -406,12 +491,12 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
           </div>
 
           {/* Verifikasi Desain & Spesifikasi Card */}
-          <div className="bg-white border border-blue-100/80 rounded-3xl p-5 shadow-xl shadow-blue-900/5 space-y-3" id="verification-status-card">
+          <div className="bg-white border border-blue-100/80 rounded-3xl p-5 shadow-xl shadow-blue-900/5 space-y-4" id="verification-status-card">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2.5">
               PRATINJAU DESAIN & SPESIFIKASI
             </h3>
 
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-3 text-xs">
               {/* QR Instagram */}
               {hasIg && (
                 <div className="flex items-center justify-between">
@@ -436,7 +521,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
               )}
 
               {/* Hasil ID Card & Sub-Spesifikasi */}
-              <div className={`space-y-2.5 ${hasIg ? 'border-t border-slate-50 pt-2.5' : ''}`}>
+              <div className={`space-y-3 ${hasIg ? 'border-t border-slate-50 pt-3' : ''}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 font-medium flex items-center gap-1.5">
                     <IdCard className="w-3.5 h-3.5 text-slate-400" />
@@ -458,66 +543,225 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                 </div>
 
                 {/* Sub Spesifikasi Per Card */}
-                <div className="ml-5 space-y-2 text-[11px]">
+                <div className="space-y-3 text-[11px]">
                   {/* 1. ID Card Universitas */}
                   {showUnivCard && (
-                    <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100/80 space-y-1.5">
-                      <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                        <span>{hasBothCards ? "1. ID Card Universitas" : "ID Card Universitas"}</span>
+                    <div className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200/60 space-y-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                            <span className={`w-2 h-2 rounded-full ${univParsed?.type === 'SUDAH_DIAMBIL' ? 'bg-emerald-500' : 'bg-blue-500'}`}></span>
+                            <span>{hasBothCards ? "1. ID Card Universitas" : "ID Card Universitas"}</span>
+                          </div>
+                          {renderStatusBadgeFromParsed(univParsed)}
+                        </div>
+                        {univParsed?.takenAtText && (
+                          <p className="text-[10.5px] text-emerald-700 font-semibold pl-3.5 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>{univParsed.takenAtText}</span>
+                          </p>
+                        )}
                       </div>
-                      <div className="pl-3 space-y-1 text-slate-600">
+
+                      <div className="pl-3.5 space-y-1 text-slate-600 border-l-2 border-blue-100">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Warna Bendera:</span>
-                          <span className="font-semibold text-slate-700">{benderaUnivVal || '-'}</span>
+                          <span className="font-bold text-slate-700">{benderaUnivVal || '-'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Warna Tali:</span>
-                          <span className="font-semibold text-slate-700">{taliUnivVal || '-'}</span>
+                          <span className="font-bold text-slate-700">{taliUnivVal || '-'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Ukuran Holder:</span>
-                          <span className="font-semibold text-slate-700">{caseUnivVal}</span>
+                          <span className="font-bold text-slate-700">{caseUnivVal}</span>
                         </div>
                       </div>
+
+                      {/* Tombol aksi khusus jika status UNIV SIAP DIAMBIL */}
+                      {univParsed?.type === 'SIAP_DIAMBIL' && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
+                          <button
+                            type="button"
+                            onClick={() => setShowPickupQrPopup(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-univ-pickup-qr"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Lihat QR Pengambilan</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPickupTime('');
+                              setPickupTimeError('');
+                              setShowPickupTimeModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-univ-confirm-time"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Konfirmasi Jam</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kelompok Saya (Di bawah ID Card Universitas) */}
+                  {(showUnivCard || (!showUnivCard && !showFakCard)) && (
+                    <div className="p-3 bg-indigo-50/60 rounded-2xl border border-indigo-100/80 flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Kelompok Saya</span>
+                        </div>
+                        <p className="text-[11px] text-indigo-700/80 font-medium">
+                          {savedGroup ? `Kelompok ${savedGroup}` : 'Belum diatur (opsional)'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={hasGroup}
+                        onClick={() => {
+                          if (hasGroup) return;
+                          setGroupInput(savedGroup);
+                          setIsConfirmingGroup(false);
+                          setShowGroupPopup(true);
+                        }}
+                        title={hasGroup ? "Kelompok sudah diatur (hanya bisa diisi sekali)" : "Atur Kelompok Saya"}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shrink-0 ${
+                          hasGroup
+                            ? 'bg-slate-100 text-slate-400 border border-slate-200/80 cursor-not-allowed opacity-75'
+                            : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white shadow-xs shadow-indigo-500/20 cursor-pointer'
+                        }`}
+                        id="btn-spec-set-group"
+                      >
+                        {hasGroup ? 'Kelompok Diatur' : 'Atur Kelompok Saya'}
+                      </button>
                     </div>
                   )}
 
                   {/* 2. ID Card Fakultas */}
                   {showFakCard && (
-                    <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100/80 space-y-1.5">
-                      <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                        <span>{hasBothCards ? "2. ID Card Fakultas" : "ID Card Fakultas"}</span>
+                    <div className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200/60 space-y-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                            <span className={`w-2 h-2 rounded-full ${fakParsed?.type === 'SUDAH_DIAMBIL' ? 'bg-emerald-500' : 'bg-blue-500'}`}></span>
+                            <span>{hasBothCards ? "2. ID Card Fakultas" : "ID Card Fakultas"}</span>
+                          </div>
+                          {renderStatusBadgeFromParsed(fakParsed)}
+                        </div>
+                        {fakParsed?.takenAtText && (
+                          <p className="text-[10.5px] text-emerald-700 font-semibold pl-3.5 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>{fakParsed.takenAtText}</span>
+                          </p>
+                        )}
                       </div>
-                      <div className="pl-3 space-y-1 text-slate-600">
+
+                      <div className="pl-3.5 space-y-1 text-slate-600 border-l-2 border-indigo-100">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Warna Bendera:</span>
-                          <span className="font-semibold text-slate-700">{benderaFakVal || '-'}</span>
+                          <span className="font-bold text-slate-700">{benderaFakVal || '-'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Warna Tali:</span>
-                          <span className="font-semibold text-slate-700">{taliFakVal || '-'}</span>
+                          <span className="font-bold text-slate-700">{taliFakVal || '-'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Ukuran Holder:</span>
-                          <span className="font-semibold text-slate-700">{caseFakVal}</span>
+                          <span className="font-bold text-slate-700">{caseFakVal}</span>
                         </div>
                       </div>
+
+                      {/* Tombol aksi khusus jika status FAK SIAP DIAMBIL */}
+                      {fakParsed?.type === 'SIAP_DIAMBIL' && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
+                          <button
+                            type="button"
+                            onClick={() => setShowPickupQrPopup(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-fak-pickup-qr"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Lihat QR Pengambilan</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPickupTime('');
+                              setPickupTimeError('');
+                              setShowPickupTimeModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-fak-confirm-time"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Konfirmasi Jam</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Fallback if legacy single card */}
+                  {/* Fallback jika legacy single card */}
                   {!showUnivCard && !showFakCard && (
-                    <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100/80 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Warna Bendera:</span>
-                        <span className="font-semibold text-slate-700">{legacyBendera}</span>
+                    <div className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200/60 space-y-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                            <span className={`w-2 h-2 rounded-full ${legacyParsed?.type === 'SUDAH_DIAMBIL' ? 'bg-emerald-500' : 'bg-blue-500'}`}></span>
+                            <span>Spesifikasi ID Card</span>
+                          </div>
+                          {renderStatusBadgeFromParsed(legacyParsed)}
+                        </div>
+                        {legacyParsed?.takenAtText && (
+                          <p className="text-[10.5px] text-emerald-700 font-semibold pl-3.5 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>{legacyParsed.takenAtText}</span>
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Warna Tali:</span>
-                        <span className="font-semibold text-slate-700">{legacyTali}</span>
+                      <div className="pl-3.5 space-y-1 text-slate-600 border-l-2 border-blue-100">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Warna Bendera:</span>
+                          <span className="font-bold text-slate-700">{legacyBendera}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Warna Tali:</span>
+                          <span className="font-bold text-slate-700">{legacyTali}</span>
+                        </div>
                       </div>
+
+                      {legacyParsed?.type === 'SIAP_DIAMBIL' && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
+                          <button
+                            type="button"
+                            onClick={() => setShowPickupQrPopup(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-legacy-pickup-qr"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Lihat QR Pengambilan</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPickupTime('');
+                              setPickupTimeError('');
+                              setShowPickupTimeModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-legacy-confirm-time"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Konfirmasi Jam</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -693,46 +937,85 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
       {/* Sticky Bottom Bar (Desktop Only) */}
       {showStickyBottom && (
         <div className="hidden sm:flex fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 py-3.5 px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-40 items-center justify-between gap-4 animate-slide-up">
-          <div className="flex flex-col text-left min-w-0">
-            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider font-mono">
-              Pratinjau Desain & Spesifikasi
-            </span>
-            <span className="text-xs text-slate-500 font-sans mt-0.5 leading-tight">
-              {getVerificationHelpText()}
-            </span>
-          </div>
+          {isAllCardsReadyForPickup ? (
+            <>
+              <div className="flex flex-col text-left min-w-0">
+                <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider font-mono">
+                  PESANAN ANDA SIAP DIAMBIL!
+                </span>
+                <span className="text-xs text-slate-600 font-sans mt-0.5 leading-tight">
+                  Silahkan mengambil pesanan pada: <strong className="text-slate-800">{formatPickupDate(order.tanggalPengambilan, false)}</strong>, hubungi admin untuk jam pastinya.
+                </span>
+              </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {hasIg && (
-              <button
-                onClick={() => order.linkQr && setShowQrPopup(true)}
-                disabled={!order.linkQr}
-                title={!order.linkQr ? "QR Instagram sedang diproses oleh desainer" : "Lihat QR Saya"}
-                className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
-                  order.linkQr 
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-xs shadow-blue-500/15 cursor-pointer active:scale-95' 
-                    : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed disabled:cursor-not-allowed border border-slate-200/50'
-                }`}
-              >
-                <Instagram className="w-3.5 h-3.5" />
-                <span>Lihat QR Saya</span>
-              </button>
-            )}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setShowPickupQrPopup(true)}
+                  className="w-52 justify-center px-4 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-500/15 cursor-pointer active:scale-95 transition-all flex items-center gap-2"
+                  id="btn-sticky-pickup-qr"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Lihat QR Pengambilan</span>
+                </button>
 
-            <button
-              onClick={() => order.linkProject && setShowProjectPopup(true)}
-              disabled={!order.linkProject}
-              title={!order.linkProject ? "Desainer sedang membuat & menyiapkan ID Card Anda" : "Lihat ID Card Saya"}
-              className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
-                order.linkProject 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-600/15 cursor-pointer active:scale-95' 
-                  : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed disabled:cursor-not-allowed border border-slate-200/50'
-              }`}
-            >
-              <IdCard className="w-3.5 h-3.5" />
-              <span>Lihat ID Card Saya</span>
-            </button>
-          </div>
+                <button
+                  onClick={() => {
+                    setSelectedPickupTime('');
+                    setPickupTimeError('');
+                    setShowPickupTimeModal(true);
+                  }}
+                  className="w-52 justify-center px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs shadow-emerald-600/15 cursor-pointer active:scale-95 transition-all flex items-center gap-2"
+                  id="btn-sticky-confirm-time"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Konfirmasi Jam ke Admin</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col text-left min-w-0">
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider font-mono">
+                  Pratinjau Desain & Spesifikasi
+                </span>
+                <span className="text-xs text-slate-500 font-sans mt-0.5 leading-tight">
+                  {getVerificationHelpText()}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {hasIg && (
+                  <button
+                    onClick={() => order.linkQr && setShowQrPopup(true)}
+                    disabled={!order.linkQr}
+                    title={!order.linkQr ? "QR Instagram sedang diproses oleh desainer" : "Lihat QR Saya"}
+                    className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                      order.linkQr 
+                        ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-xs shadow-blue-500/15 cursor-pointer active:scale-95' 
+                        : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed disabled:cursor-not-allowed border border-slate-200/50'
+                    }`}
+                  >
+                    <Instagram className="w-3.5 h-3.5" />
+                    <span>Lihat QR Saya</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => order.linkProject && setShowProjectPopup(true)}
+                  disabled={!order.linkProject}
+                  title={!order.linkProject ? "Desainer sedang membuat & menyiapkan ID Card Anda" : "Lihat ID Card Saya"}
+                  className={`w-44 justify-center px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                    order.linkProject 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-600/15 cursor-pointer active:scale-95' 
+                      : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed disabled:cursor-not-allowed border border-slate-200/50'
+                  }`}
+                >
+                  <IdCard className="w-3.5 h-3.5" />
+                  <span>Lihat ID Card Saya</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1300,6 +1583,135 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 5: KONFIRMASI JAM PENGAMBILAN */}
+      {showPickupTimeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-5 animate-scale-up">
+            <button 
+              onClick={() => {
+                setShowPickupTimeModal(false);
+                setPickupTimeError('');
+              }}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+              id="btn-close-pickup-time-modal"
+              title="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-1 text-center pr-6">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-emerald-100">
+                <Clock className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 font-display">Konfirmasi Jam Pengambilan</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Pilih jam estimasi pengambilan pesanan Anda pada <span className="font-bold text-slate-700">{formatPickupDate(order.tanggalPengambilan, true)}</span>.
+              </p>
+            </div>
+
+            <div className="space-y-3 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <label className="block text-xs font-bold text-slate-700">
+                Jam Pengambilan (09:00 - 18:00 WITA):
+              </label>
+              
+              <div className="relative">
+                <input 
+                  type="time" 
+                  min="09:00" 
+                  max="18:00"
+                  step="900"
+                  value={selectedPickupTime}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedPickupTime(val);
+                    const v = validatePickupTime(val);
+                    setPickupTimeError(v.isValid ? '' : v.errorMsg);
+                  }}
+                  className={`w-full px-4 py-3 bg-white border rounded-xl font-bold text-base text-slate-800 focus:outline-none focus:ring-2 transition-all shadow-xs ${
+                    pickupTimeError ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-300 focus:ring-emerald-500 focus:border-emerald-500'
+                  }`}
+                  id="input-pickup-time"
+                />
+              </div>
+
+              {/* Preset Hour Badges */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {['09:00', '10:00', '12:00', '14:00', '16:00', '18:00'].map((timePreset) => (
+                  <button
+                    key={timePreset}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPickupTime(timePreset);
+                      setPickupTimeError('');
+                    }}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                      selectedPickupTime === timePreset 
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' 
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {timePreset} WITA
+                  </button>
+                ))}
+              </div>
+
+              {pickupTimeError ? (
+                <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pt-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{pickupTimeError}</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-400 italic pt-0.5">
+                  * Operasional toko pukul 09.00 - 18.00 WITA.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                disabled={!validatePickupTime(selectedPickupTime).isValid}
+                onClick={() => {
+                  const v = validatePickupTime(selectedPickupTime);
+                  if (!v.isValid) {
+                    setPickupTimeError(v.errorMsg);
+                    return;
+                  }
+
+                  const formattedDateStr = formatPickupDate(order.tanggalPengambilan, true);
+                  const waMsg = `Halo Admin Dity Store, saya ingin mengonfirmasi jam pengambilan pesanan:\n\n*ID Order:* ${order.id}\n*Nama:* ${order.clientName || order.clientId}\n*Tanggal:* ${formattedDateStr}\n*Estimasi Jam:* ${selectedPickupTime} WITA\n\nMohon konfirmasinya. Terima kasih!`;
+                  
+                  const waUrl = `https://wa.me/62895634048237?text=${encodeURIComponent(waMsg)}`;
+                  window.open(waUrl, '_blank');
+                  setShowPickupTimeModal(false);
+                  onShowToast?.("Membuka WhatsApp untuk mengonfirmasi jam ke Admin...");
+                }}
+                className={`w-full py-3.5 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2.5 ${
+                  validatePickupTime(selectedPickupTime).isValid
+                    ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white shadow-md shadow-emerald-500/20 cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 border border-slate-300/80 cursor-not-allowed opacity-75 shadow-none'
+                }`}
+                id="btn-confirm-pickup-time-wa"
+              >
+                <WhatsAppIcon />
+                <span>Konfirmasi ke Admin via WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPickupTimeModal(false);
+                  setPickupTimeError('');
+                }}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
           </div>
         </div>
       )}

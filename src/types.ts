@@ -48,4 +48,5 @@ export interface Order {
   ukuranCaseFak?: string;    // UKURAN_CASE_FAK
   bisaRefund?: boolean;      // BISA_REFUND
   noKelompok?: string;       // NO_KELOMPOK
+  tanggalPengambilan?: string; // TANGGAL_PENGAMBILAN
 }
