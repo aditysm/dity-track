@@ -49,4 +49,5 @@ export interface Order {
   bisaRefund?: boolean;      // BISA_REFUND
   noKelompok?: string;       // NO_KELOMPOK
   tanggalPengambilan?: string; // TANGGAL_PENGAMBILAN
+  jamPengambilan?: string;     // JAM_PENGAMBILAN
 }

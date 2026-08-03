@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users, Clock
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users, Clock, MapPin
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername, formatPickupDate } from '../utils';
@@ -20,6 +20,22 @@ const cleanNoKelompokStr = (val: string | undefined): string => {
   return String(val).replace(/[^0-9]/g, '').trim();
 };
 
+const getPickupLocationInfo = (tanggalStr?: string) => {
+  const s = String(tanggalStr || '').toLowerCase();
+  if (s.includes('5 agustus') || s.includes('05-08') || s.includes('2026-08-05') || s.includes('05/08') || s.includes(' 5 ')) {
+    return {
+      name: 'Auditorium M. Yusuf Abubakar UNRAM',
+      url: 'https://maps.app.goo.gl/2B4SrHnHrF78sGEn8',
+      dateLabel: '5 Agustus 2026'
+    };
+  }
+  return {
+    name: 'Depan GMB Gym Fitness',
+    url: 'https://maps.app.goo.gl/GPNj5SG3BBbiYc6i8',
+    dateLabel: '4 Agustus 2026'
+  };
+};
+
 // Custom inline WhatsApp SVG icon
 const WhatsAppIcon = () => (
   <svg 
@@ -36,30 +52,143 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
   const [showPickupQrPopup, setShowPickupQrPopup] = useState(false);
+
+  const [savedPickupTime, setSavedPickupTime] = useState<string>(() => {
+    return order.jamPengambilan || localStorage.getItem(`pickup_time_${order.id}`) || '';
+  });
+  const [isPickupTimeLocked, setIsPickupTimeLocked] = useState<boolean>(() => {
+    const localVal = localStorage.getItem(`pickup_time_${order.id}`);
+    const isLockedLocal = localStorage.getItem(`pickup_time_locked_${order.id}`) === 'true';
+    return !!(order.jamPengambilan || (localVal && isLockedLocal));
+  });
+
   const [showPickupTimeModal, setShowPickupTimeModal] = useState(false);
   const [selectedPickupTime, setSelectedPickupTime] = useState('');
   const [pickupTimeError, setPickupTimeError] = useState('');
+  const [isSavingPickupTime, setIsSavingPickupTime] = useState(false);
+
+  useEffect(() => {
+    const localVal = localStorage.getItem(`pickup_time_${order.id}`);
+    const isLockedLocal = localStorage.getItem(`pickup_time_locked_${order.id}`) === 'true';
+    const val = order.jamPengambilan || localVal || '';
+    setSavedPickupTime(val);
+    setIsPickupTimeLocked(!!(order.jamPengambilan || (localVal && isLockedLocal)));
+  }, [order.jamPengambilan, order.id]);
+
+  const locationInfo = getPickupLocationInfo(order.tanggalPengambilan);
+
+  const getMinPickupTime = (): { hour: number; minute: number; timeStr: string } => {
+    const defaultMinH = 10;
+    const defaultMinM = 0;
+    
+    const existingStr = order.jamPengambilan || savedPickupTime;
+    if (!existingStr || !existingStr.trim()) {
+      return { hour: defaultMinH, minute: defaultMinM, timeStr: '10:00' };
+    }
+    
+    const match = existingStr.trim().match(/(\d{1,2})[:.](\d{2})/);
+    if (match) {
+      const exH = parseInt(match[1], 10);
+      const exM = parseInt(match[2], 10);
+      if (!isNaN(exH) && !isNaN(exM)) {
+        if (exH > defaultMinH || (exH === defaultMinH && exM > defaultMinM)) {
+          const hh = String(exH).padStart(2, '0');
+          const mm = String(exM).padStart(2, '0');
+          return { hour: exH, minute: exM, timeStr: `${hh}:${mm}` };
+        }
+      }
+    }
+    return { hour: defaultMinH, minute: defaultMinM, timeStr: '10:00' };
+  };
 
   const validatePickupTime = (timeStr: string): { isValid: boolean; errorMsg: string } => {
     if (!timeStr || !timeStr.trim()) {
-      return { isValid: false, errorMsg: 'Silahkan pilih jam pengambilan (09:00 - 18:00 WITA).' };
+      return { isValid: false, errorMsg: 'Silahkan pilih jam pengambilan (minimal 10.00 WITA).' };
     }
-    const parts = timeStr.trim().split(':');
-    if (parts.length < 2) {
+    const match = timeStr.trim().match(/(\d{1,2})[:.](\d{2})/);
+    if (!match) {
       return { isValid: false, errorMsg: 'Format jam tidak valid.' };
     }
-    const h = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
+    const h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
     if (isNaN(h) || isNaN(m)) {
       return { isValid: false, errorMsg: 'Format jam tidak valid.' };
     }
-    if (h < 9) {
-      return { isValid: false, errorMsg: 'Jam pengambilan tidak boleh kurang dari jam 09:00 pagi WITA.' };
+
+    const minLimit = getMinPickupTime();
+    if (h < minLimit.hour || (h === minLimit.hour && m < minLimit.minute)) {
+      const formattedMin = minLimit.timeStr.replace(':', '.');
+      return { 
+        isValid: false, 
+        errorMsg: `Jam pengambilan tidak boleh kurang dari pukul ${formattedMin} WITA.` 
+      };
     }
+
     if (h > 18 || (h === 18 && m > 0)) {
       return { isValid: false, errorMsg: 'Jam pengambilan tidak boleh lebih dari jam 18:00 sore WITA.' };
     }
+
     return { isValid: true, errorMsg: '' };
+  };
+
+  const handleOpenPickupModal = () => {
+    const minLimit = getMinPickupTime();
+    const initialTime = savedPickupTime || order.jamPengambilan || minLimit.timeStr;
+    setSelectedPickupTime(initialTime);
+    setPickupTimeError('');
+    setShowPickupTimeModal(true);
+  };
+
+  const handleSavePickupTime = async () => {
+    const v = validatePickupTime(selectedPickupTime);
+    if (!v.isValid) {
+      setPickupTimeError(v.errorMsg);
+      return;
+    }
+
+    const match = selectedPickupTime.trim().match(/(\d{1,2})[:.](\d{2})/);
+    if (!match) return;
+    const hh = ("0" + match[1]).slice(-2);
+    const mm = ("0" + match[2]).slice(-2);
+    const formattedJam = `${hh}:${mm}`;
+
+    setIsSavingPickupTime(true);
+
+    localStorage.setItem(`pickup_time_${order.id}`, formattedJam);
+    localStorage.setItem(`pickup_time_locked_${order.id}`, 'true');
+    setSavedPickupTime(formattedJam);
+    setIsPickupTimeLocked(true);
+
+    // Silent background sync
+    fetch('/api/update-jam-pengambilan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        orderId: order.id,
+        jamPengambilan: formattedJam
+      })
+    }).catch(err => console.warn('[OrderDetail] Background jam update silent sync error:', err));
+
+    const dateFormattedStr = formatPickupDate(order.tanggalPengambilan, true);
+    const clientNameStr = order.clientName || getEmailDisplayName(order.clientId);
+    const itemsOrderedStr = itemDescription || 'ID Card';
+    const timeFormattedStr = formattedJam.replace(':', '.');
+
+    const waMsg = `Halo Admin Dity Store, saya mengonfirmasi jam pengambilan pesanan:\n\n*ID Order:* ${order.id}\n*Nama Pemesan:* ${clientNameStr}\n*Detail Pesanan:* ${itemsOrderedStr}\n*Tanggal Pengambilan:* ${dateFormattedStr}\n*Estimasi Jam:* ${timeFormattedStr} WITA\n*Lokasi Pengambilan:* ${locationInfo.name}\n\nMohon bantuannya untuk persiapan barang. Terima kasih!`;
+
+    const waUrl = `https://wa.me/62895634048237?text=${encodeURIComponent(waMsg)}`;
+
+    setTimeout(() => {
+      setIsSavingPickupTime(false);
+      setShowPickupTimeModal(false);
+      onShowToast?.(`Jam ${timeFormattedStr} WITA disimpan & membuka WhatsApp Admin...`);
+      window.open(waUrl, '_blank');
+      if (typeof window !== 'undefined' && (window as any).refreshOrders) {
+        (window as any).refreshOrders();
+      }
+    }, 400);
   };
 
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -271,12 +400,12 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
     },
     {
       title: 'Proses Pengerjaan',
-      desc: 'Desainer kami sedang memproses desain ID Card sesuai spesifikasi formulir Anda.',
+      desc: 'Berkas desain digital/project sedang dikerjakan. Terpotong biaya administrasi & desain.',
       statusKey: 'DIKERJAKAN'
     },
     {
       title: 'Proses Pembuatan',
-      desc: 'Desain telah dikunci dan sedang dalam produksi cetak ID Card.',
+      desc: 'Pesanan sudah masuk tahap antrean pencetakan fisik/persiapan bahan baku.',
       statusKey: 'DIBUAT'
     },
     {
@@ -544,6 +673,54 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
 
                 {/* Sub Spesifikasi Per Card */}
                 <div className="space-y-3 text-[11px]">
+                  {/* Jadwal & Lokasi Pengambilan Card */}
+                  <div className="p-3 bg-emerald-50/70 rounded-2xl border border-emerald-100/90 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Jadwal & Lokasi Pengambilan</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-[11px] text-slate-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Tanggal:</span>
+                        <span className="font-bold text-slate-800">{formatPickupDate(order.tanggalPengambilan, true)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Jam Pengambilan:</span>
+                        <span className="font-bold text-emerald-700">
+                          {savedPickupTime ? `${savedPickupTime.replace(':', '.')} WITA` : 'Belum diatur (Minimal 10.00 WITA)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between flex-wrap gap-2">
+                      <a
+                        href={locationInfo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100/50 border border-emerald-200 text-emerald-800 font-bold text-[11px] shadow-2xs transition-all cursor-pointer active:scale-95"
+                        id="btn-location-gmaps-spec"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Lokasi: {locationInfo.name}</span>
+                        <ExternalLink className="w-3 h-3 text-emerald-500 shrink-0" />
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenPickupModal}
+                        title="Konfirmasi atau Ubah Jam Pengambilan"
+                        className="px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs cursor-pointer"
+                        id="btn-spec-set-pickup-time"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{savedPickupTime ? 'Konfirmasi / Ubah Jam' : 'Atur Jam'}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* 1. ID Card Universitas */}
                   {showUnivCard && (
                     <div className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200/60 space-y-2">
@@ -592,16 +769,13 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedPickupTime('');
-                              setPickupTimeError('');
-                              setShowPickupTimeModal(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            onClick={handleOpenPickupModal}
+                            title="Konfirmasi Jam Pengambilan"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
                             id="btn-univ-confirm-time"
                           >
                             <Clock className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Jam</span>
+                            <span>Konfirmasi Jam ke Admin</span>
                           </button>
                         </div>
                       )}
@@ -691,16 +865,13 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedPickupTime('');
-                              setPickupTimeError('');
-                              setShowPickupTimeModal(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            onClick={handleOpenPickupModal}
+                            title="Konfirmasi Jam Pengambilan"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
                             id="btn-fak-confirm-time"
                           >
                             <Clock className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Jam</span>
+                            <span>Konfirmasi Jam ke Admin</span>
                           </button>
                         </div>
                       )}
@@ -749,16 +920,13 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedPickupTime('');
-                              setPickupTimeError('');
-                              setShowPickupTimeModal(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            onClick={handleOpenPickupModal}
+                            title="Konfirmasi Jam Pengambilan"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
                             id="btn-legacy-confirm-time"
                           >
                             <Clock className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Jam</span>
+                            <span>Konfirmasi Jam ke Admin</span>
                           </button>
                         </div>
                       )}
@@ -959,11 +1127,8 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                 </button>
 
                 <button
-                  onClick={() => {
-                    setSelectedPickupTime('');
-                    setPickupTimeError('');
-                    setShowPickupTimeModal(true);
-                  }}
+                  onClick={handleOpenPickupModal}
+                  title="Konfirmasi Jam Pengambilan ke Admin WhatsApp"
                   className="w-52 justify-center px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs shadow-emerald-600/15 cursor-pointer active:scale-95 transition-all flex items-center gap-2"
                   id="btn-sticky-confirm-time"
                 >
@@ -1592,38 +1757,66 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full border border-slate-100 p-6 md:p-8 shadow-2xl relative flex flex-col space-y-5 animate-scale-up">
             <button 
+              disabled={isSavingPickupTime}
               onClick={() => {
+                if (isSavingPickupTime) return;
                 setShowPickupTimeModal(false);
                 setPickupTimeError('');
               }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-all cursor-pointer disabled:opacity-40"
               id="btn-close-pickup-time-modal"
               title="Tutup"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="space-y-1 text-center pr-6">
-              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-emerald-100">
-                <Clock className="w-5 h-5" />
+            <div className="space-y-1.5 text-center pr-4">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-emerald-100">
+                <Clock className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-slate-800 font-display">Konfirmasi Jam Pengambilan</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Pilih jam estimasi pengambilan pesanan Anda pada <span className="font-bold text-slate-700">{formatPickupDate(order.tanggalPengambilan, true)}</span>.
+                Pilih jam estimasi pengambilan pesanan Anda pada <span className="font-bold text-slate-800">{formatPickupDate(order.tanggalPengambilan, true)}</span>.
               </p>
+            </div>
+
+            {/* Info Lokasi Pengambilan */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Lokasi Pengambilan:</span>
+                <a
+                  href={locationInfo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 font-bold hover:underline"
+                  id="link-pickup-gmaps-modal"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{locationInfo.name}</span>
+                  <ExternalLink className="w-3 h-3 text-emerald-500" />
+                </a>
+              </div>
+
+              <div className="text-[11px] text-slate-500 bg-amber-50/70 border border-amber-200/60 p-2 rounded-xl flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Perhatian:</strong> Jam pengambilan hanya dapat diatur <strong>1 kali saja</strong> dan tidak dapat diubah di bawah jam yang sudah ditentukan (minimal jam 10.00 WITA).
+                </span>
+              </div>
             </div>
 
             <div className="space-y-3 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
               <label className="block text-xs font-bold text-slate-700">
-                Jam Pengambilan (09:00 - 18:00 WITA):
+                Jam Pengambilan (Min. {getMinPickupTime().timeStr.replace(':', '.')} - Max 18.00 WITA):
               </label>
               
               <div className="relative">
                 <input 
                   type="time" 
-                  min="09:00" 
+                  min={getMinPickupTime().timeStr} 
                   max="18:00"
                   step="900"
+                  disabled={isSavingPickupTime}
                   value={selectedPickupTime}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -1631,7 +1824,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                     const v = validatePickupTime(val);
                     setPickupTimeError(v.isValid ? '' : v.errorMsg);
                   }}
-                  className={`w-full px-4 py-3 bg-white border rounded-xl font-bold text-base text-slate-800 focus:outline-none focus:ring-2 transition-all shadow-xs ${
+                  className={`w-full px-4 py-3 bg-white border rounded-xl font-bold text-base text-slate-800 focus:outline-none focus:ring-2 transition-all shadow-xs disabled:opacity-60 ${
                     pickupTimeError ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-300 focus:ring-emerald-500 focus:border-emerald-500'
                   }`}
                   id="input-pickup-time"
@@ -1640,23 +1833,32 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
 
               {/* Preset Hour Badges */}
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {['09:00', '10:00', '12:00', '14:00', '16:00', '18:00'].map((timePreset) => (
-                  <button
-                    key={timePreset}
-                    type="button"
-                    onClick={() => {
-                      setSelectedPickupTime(timePreset);
-                      setPickupTimeError('');
-                    }}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                      selectedPickupTime === timePreset 
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' 
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {timePreset} WITA
-                  </button>
-                ))}
+                {['10:00', '11:00', '13:00', '15:00', '16:00', '17:00'].map((timePreset) => {
+                  const minLimit = getMinPickupTime();
+                  const [presetH, presetM] = timePreset.split(':').map(Number);
+                  const isPresetDisabled = (presetH * 60 + presetM) < (minLimit.hour * 60 + minLimit.minute);
+
+                  return (
+                    <button
+                      key={timePreset}
+                      type="button"
+                      disabled={isPresetDisabled || isSavingPickupTime}
+                      onClick={() => {
+                        setSelectedPickupTime(timePreset);
+                        setPickupTimeError('');
+                      }}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                        isPresetDisabled
+                          ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
+                          : selectedPickupTime === timePreset 
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs cursor-pointer' 
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                      }`}
+                    >
+                      {timePreset.replace(':', '.')} WITA
+                    </button>
+                  );
+                })}
               </div>
 
               {pickupTimeError ? (
@@ -1666,7 +1868,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                 </p>
               ) : (
                 <p className="text-[11px] text-slate-400 italic pt-0.5">
-                  * Operasional toko pukul 09.00 - 18.00 WITA.
+                  * Jam operasional toko pukul 10.00 - 18.00 WITA. Minimal jam {getMinPickupTime().timeStr.replace(':', '.')}.
                 </p>
               )}
             </div>
@@ -1674,40 +1876,36 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
             <div className="space-y-2 pt-1">
               <button
                 type="button"
-                disabled={!validatePickupTime(selectedPickupTime).isValid}
-                onClick={() => {
-                  const v = validatePickupTime(selectedPickupTime);
-                  if (!v.isValid) {
-                    setPickupTimeError(v.errorMsg);
-                    return;
-                  }
-
-                  const formattedDateStr = formatPickupDate(order.tanggalPengambilan, true);
-                  const waMsg = `Halo Admin Dity Store, saya ingin mengonfirmasi jam pengambilan pesanan:\n\n*ID Order:* ${order.id}\n*Nama:* ${order.clientName || order.clientId}\n*Tanggal:* ${formattedDateStr}\n*Estimasi Jam:* ${selectedPickupTime} WITA\n\nMohon konfirmasinya. Terima kasih!`;
-                  
-                  const waUrl = `https://wa.me/62895634048237?text=${encodeURIComponent(waMsg)}`;
-                  window.open(waUrl, '_blank');
-                  setShowPickupTimeModal(false);
-                  onShowToast?.("Membuka WhatsApp untuk mengonfirmasi jam ke Admin...");
-                }}
+                disabled={!validatePickupTime(selectedPickupTime).isValid || isSavingPickupTime}
+                onClick={handleSavePickupTime}
                 className={`w-full py-3.5 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2.5 ${
-                  validatePickupTime(selectedPickupTime).isValid
+                  validatePickupTime(selectedPickupTime).isValid && !isSavingPickupTime
                     ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white shadow-md shadow-emerald-500/20 cursor-pointer'
                     : 'bg-slate-200 text-slate-400 border border-slate-300/80 cursor-not-allowed opacity-75 shadow-none'
                 }`}
                 id="btn-confirm-pickup-time-wa"
               >
-                <WhatsAppIcon />
-                <span>Konfirmasi ke Admin via WhatsApp</span>
+                {isSavingPickupTime ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan Jam Pengambilan...</span>
+                  </>
+                ) : (
+                  <>
+                    <WhatsAppIcon />
+                    <span>Konfirmasi ke Admin via WhatsApp</span>
+                  </>
+                )}
               </button>
 
               <button
                 type="button"
+                disabled={isSavingPickupTime}
                 onClick={() => {
                   setShowPickupTimeModal(false);
                   setPickupTimeError('');
                 }}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50"
               >
                 Batal
               </button>

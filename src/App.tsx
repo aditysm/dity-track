@@ -151,7 +151,8 @@ export default function App() {
             ukuranCaseFak: o.UKURAN_CASE_FAK || '',
             bisaRefund: !!o.BISA_REFUND,
             noKelompok: noKelompokClean,
-            tanggalPengambilan: o.TANGGAL_PENGAMBILAN || '2026-08-04'
+            tanggalPengambilan: o.TANGGAL_PENGAMBILAN || '2026-08-04',
+            jamPengambilan: o.JAM_PENGAMBILAN || ''
           };
         });
         
@@ -343,6 +344,7 @@ export default function App() {
           const rawStatusFak = getCellByCol(rObj, rawCells, ["STATUS_FAK", "STATUS FAK", "STATUS_FAKULTAS", "STATUS FAKULTAS", "SERAH_TERIMA_FAK", "DIAMBIL_FAK", "TAKEN_FAK", "STATUS TAKEN FAK"], 20);
           const rawNoKelompok = getCellByCol(rObj, rawCells, ["NO_KELOMPOK", "NO KELOMPOK", "KELOMPOK", "NO_GROUP", "GROUP"], 21);
           const rawTanggalPengambilan = getCellByCol(rObj, rawCells, ["TANGGAL_PENGAMBILAN", "TANGGAL PENGAMBILAN", "TGL_PENGAMBILAN", "TGL PENGAMBILAN", "PICKUP_DATE", "TANGGAL"], 22);
+          const rawJamPengambilan = getCellByCol(rObj, rawCells, ["JAM_PENGAMBILAN", "JAM PENGAMBILAN", "JAM_PICKUP", "JAM PICKUP", "JAM"], 23);
           const noKelompokClean = rawNoKelompok ? String(rawNoKelompok).replace(/[^0-9]/g, '').trim() : '';
           if (orderId) {
             localStorage.setItem(`group_${orderId}`, noKelompokClean);
@@ -383,7 +385,8 @@ export default function App() {
             ukuranCaseFak: rawUkuranCaseFak,
             bisaRefund: bisaRefund,
             noKelompok: noKelompokClean,
-            tanggalPengambilan: rawTanggalPengambilan ? String(rawTanggalPengambilan).trim() : '2026-08-04'
+            tanggalPengambilan: rawTanggalPengambilan ? String(rawTanggalPengambilan).trim() : '2026-08-04',
+            jamPengambilan: rawJamPengambilan ? String(rawJamPengambilan).trim() : ''
           };
         }).filter((order: Order) => order.id !== "" && order.id !== "ORDER_ID");
         
