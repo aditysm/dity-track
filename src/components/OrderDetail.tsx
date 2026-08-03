@@ -377,9 +377,14 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   const isSiapDiambil = order.status === 'SIAP DIAMBIL';
 
   // Status per ID Card (Univ / Fak) mempengaruhi Sticky Bottom Bar & Pratinjau Desain & Spesifikasi
-  const isAnyCardReadyForPickup = (univParsed?.type === 'SIAP_DIAMBIL') || 
-                                  (fakParsed?.type === 'SIAP_DIAMBIL') || 
-                                  (legacyParsed?.type === 'SIAP_DIAMBIL');
+  const isUnivReady = showUnivCard && (univParsed?.type === 'SIAP_DIAMBIL');
+  const isFakReady = showFakCard && (fakParsed?.type === 'SIAP_DIAMBIL');
+  const isLegacyReady = (!showUnivCard && !showFakCard) && (
+    (order.statusUniv && order.statusUniv.toUpperCase().includes('SIAP DIAMBIL')) ||
+    (order.statusFak && order.statusFak.toUpperCase().includes('SIAP DIAMBIL'))
+  );
+
+  const isAnyCardReadyForPickup = isUnivReady || isFakReady || isLegacyReady;
   const isAllCardsReadyForPickup = isAnyCardReadyForPickup;
   const showStickyBottom = !isCancelled;
 
@@ -673,53 +678,55 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
 
                 {/* Sub Spesifikasi Per Card */}
                 <div className="space-y-3 text-[11px]">
-                  {/* Jadwal & Lokasi Pengambilan Card */}
-                  <div className="p-3 bg-emerald-50/70 rounded-2xl border border-emerald-100/90 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Jadwal & Lokasi Pengambilan</span>
+                  {/* Jadwal & Lokasi Pengambilan Card - Hanya tampil jika status SIAP DIAMBIL */}
+                  {isAnyCardReadyForPickup && (
+                    <div className="p-3 bg-emerald-50/70 rounded-2xl border border-emerald-100/90 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Jadwal & Lokasi Pengambilan</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 text-[11px] text-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Tanggal:</span>
+                          <span className="font-bold text-slate-800">{formatPickupDate(order.tanggalPengambilan, true)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Jam Pengambilan:</span>
+                          <span className="font-bold text-emerald-700">
+                            {savedPickupTime ? `${savedPickupTime.replace(':', '.')} WITA` : 'Belum diatur (Minimal 10.00 WITA)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between flex-wrap gap-2">
+                        <a
+                          href={locationInfo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100/50 border border-emerald-200 text-emerald-800 font-bold text-[11px] shadow-2xs transition-all cursor-pointer active:scale-95"
+                          id="btn-location-gmaps-spec"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Lokasi: {locationInfo.name}</span>
+                          <ExternalLink className="w-3 h-3 text-emerald-500 shrink-0" />
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={handleOpenPickupModal}
+                          title="Konfirmasi atau Ubah Jam Pengambilan"
+                          className="px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs cursor-pointer"
+                          id="btn-spec-set-pickup-time"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{savedPickupTime ? 'Konfirmasi / Ubah Jam' : 'Atur Jam'}</span>
+                        </button>
                       </div>
                     </div>
-
-                    <div className="space-y-1 text-[11px] text-slate-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Tanggal:</span>
-                        <span className="font-bold text-slate-800">{formatPickupDate(order.tanggalPengambilan, true)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Jam Pengambilan:</span>
-                        <span className="font-bold text-emerald-700">
-                          {savedPickupTime ? `${savedPickupTime.replace(':', '.')} WITA` : 'Belum diatur (Minimal 10.00 WITA)'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between flex-wrap gap-2">
-                      <a
-                        href={locationInfo.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100/50 border border-emerald-200 text-emerald-800 font-bold text-[11px] shadow-2xs transition-all cursor-pointer active:scale-95"
-                        id="btn-location-gmaps-spec"
-                      >
-                        <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>Lokasi: {locationInfo.name}</span>
-                        <ExternalLink className="w-3 h-3 text-emerald-500 shrink-0" />
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={handleOpenPickupModal}
-                        title="Konfirmasi atau Ubah Jam Pengambilan"
-                        className="px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs cursor-pointer"
-                        id="btn-spec-set-pickup-time"
-                      >
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{savedPickupTime ? 'Konfirmasi / Ubah Jam' : 'Atur Jam'}</span>
-                      </button>
-                    </div>
-                  </div>
+                  )}
 
                   {/* 1. ID Card Universitas */}
                   {showUnivCard && (
