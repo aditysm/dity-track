@@ -177,13 +177,13 @@ export default function PolicyPage({ onBack, onNavigatePrivacy }: PolicyPageProp
                     <td className="p-3 text-slate-600">Pesanan belum masuk antrean desain/cetak. Dana dikembalikan penuh.</td>
                   </tr>
                   <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3 font-bold text-amber-600 font-mono">DIBUAT</td>
-                    <td className="p-3 text-center font-extrabold text-amber-600 bg-amber-50/50">50%</td>
+                    <td className="p-3 font-bold text-orange-600 font-mono">DIKERJAKAN</td>
+                    <td className="p-3 text-center font-extrabold text-orange-600 bg-orange-50/50">80%</td>
                     <td className="p-3 text-slate-600">Berkas desain digital/project sedang dikerjakan. Terpotong biaya administrasi & desain.</td>
                   </tr>
                   <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3 font-bold text-orange-600 font-mono">DIKERJAKAN</td>
-                    <td className="p-3 text-center font-extrabold text-orange-600 bg-orange-50/50">85%</td>
+                    <td className="p-3 font-bold text-amber-600 font-mono">DIBUAT</td>
+                    <td className="p-3 text-center font-extrabold text-amber-600 bg-amber-50/50">50%</td>
                     <td className="p-3 text-slate-600">Pesanan sudah masuk tahap antrean pencetakan fisik/persiapan bahan baku.</td>
                   </tr>
                   <tr className="hover:bg-slate-50 transition-colors">
