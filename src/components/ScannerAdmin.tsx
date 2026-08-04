@@ -49,7 +49,7 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
     const cleanPw = password.trim();
-    if (cleanPw === 'adit312') {
+    if (cleanPw === 'qwerty123') {
       sessionStorage.setItem('dity_admin_auth', 'true');
       setIsAuthenticated(true);
       setAuthError('');

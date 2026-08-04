@@ -52,6 +52,12 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   const [showQrPopup, setShowQrPopup] = useState(false);
   const [showProjectPopup, setShowProjectPopup] = useState(false);
   const [showPickupQrPopup, setShowPickupQrPopup] = useState(false);
+  const [isQrLoading, setIsQrLoading] = useState(true);
+
+  const handleOpenPickupQrModal = () => {
+    setIsQrLoading(true);
+    setShowPickupQrPopup(true);
+  };
 
   const [savedPickupTime, setSavedPickupTime] = useState<string>(() => {
     return order.jamPengambilan || localStorage.getItem(`pickup_time_${order.id}`) || '';
@@ -767,7 +773,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                         <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
                           <button
                             type="button"
-                            onClick={() => setShowPickupQrPopup(true)}
+                            onClick={handleOpenPickupQrModal}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
                             id="btn-univ-pickup-qr"
                           >
@@ -863,7 +869,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                         <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
                           <button
                             type="button"
-                            onClick={() => setShowPickupQrPopup(true)}
+                            onClick={handleOpenPickupQrModal}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
                             id="btn-fak-pickup-qr"
                           >
@@ -918,7 +924,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                         <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
                           <button
                             type="button"
-                            onClick={() => setShowPickupQrPopup(true)}
+                            onClick={handleOpenPickupQrModal}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
                             id="btn-legacy-pickup-qr"
                           >
@@ -1125,7 +1131,7 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
 
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setShowPickupQrPopup(true)}
+                  onClick={handleOpenPickupQrModal}
                   className="w-52 justify-center px-4 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-500/15 cursor-pointer active:scale-95 transition-all flex items-center gap-2"
                   id="btn-sticky-pickup-qr"
                 >
@@ -1514,11 +1520,19 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
 
             {/* QR Code Container */}
             <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 shadow-inner">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs relative w-48 h-48 flex items-center justify-center">
+                {isQrLoading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white rounded-xl z-10 space-y-2">
+                    <Loader2 className="w-7 h-7 text-blue-600 animate-spin" />
+                    <span className="text-[11px] font-medium text-slate-400">Memuat QR Code...</span>
+                  </div>
+                )}
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(order.id)}`} 
                   alt={`QR Pengambilan ${order.id}`}
-                  className="w-48 h-48 object-contain rounded-md"
+                  onLoad={() => setIsQrLoading(false)}
+                  onError={() => setIsQrLoading(false)}
+                  className={`w-48 h-48 object-contain rounded-md transition-opacity duration-300 ${isQrLoading ? 'opacity-0' : 'opacity-100'}`}
                 />
               </div>
 
@@ -1527,6 +1541,12 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                   {order.id}
                 </div>
                 <p className="text-xs font-semibold text-slate-700">{order.clientName || order.clientId}</p>
+                {order.parsedData?.fakultas && order.parsedData.fakultas !== '-' && (
+                  <p className="text-xs font-medium text-slate-600">{order.parsedData.fakultas}</p>
+                )}
+                <p className="text-xs font-medium text-slate-600">
+                  Kelompok: {savedGroup || cleanNoKelompokStr(order.noKelompok) || ' '}
+                </p>
               </div>
             </div>
 
