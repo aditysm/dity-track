@@ -65,7 +65,7 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
     setPassword('');
   };
 
-  // Start Camera QR Reader
+  // Start Camera QR Reader with maximum speed & performance
   const startScanner = () => {
     setCameraError(null);
     setCameraActive(true);
@@ -75,23 +75,38 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
         const html5QrCode = new Html5Qrcode("reader");
         qrRef.current = html5QrCode;
 
+        const config = {
+          fps: 30, // 30 FPS for fast QR detection
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const edge = Math.floor(minEdge * 0.75);
+            return { width: Math.max(edge, 180), height: Math.max(edge, 180) };
+          },
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true // Native hardware acceleration if available
+          }
+        };
+
         html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 240, height: 240 } },
+          config,
           (decodedText) => {
             const trimmed = decodedText.trim();
             if (trimmed) {
-              html5QrCode.stop().then(() => {
-                qrRef.current = null;
-                setCameraActive(false);
-                setScannedOrder(trimmed);
-                setStatusMsg(null);
-              }).catch(err => {
-                console.error('[Scanner] Stop error:', err);
-                setCameraActive(false);
-                setScannedOrder(trimmed);
-                setStatusMsg(null);
-              });
+              // Immediately show scanned result in 0ms delay
+              setScannedOrder(trimmed);
+              setStatusMsg(null);
+              setCameraActive(false);
+
+              // Stop camera scanner asynchronously
+              if (html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                  qrRef.current = null;
+                }).catch((err) => {
+                  console.error('[Scanner] Async stop error:', err);
+                  qrRef.current = null;
+                });
+              }
             }
           },
           () => {}
@@ -105,7 +120,7 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
         setCameraActive(false);
         setCameraError("Terjadi kesalahan saat menginisialisasi kamera pemindai.");
       }
-    }, 120);
+    }, 30);
   };
 
   const stopScanner = () => {
@@ -237,19 +252,26 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
   // Overall order status
   const rawOverallStatus = matchedOrder?.status ? matchedOrder.status.trim().toUpperCase() : '';
   const isOverallTaken = isStatusTaken(rawOverallStatus);
-  const isOverallReady = !isOverallTaken && (rawOverallStatus === 'SIAP DIAMBIL' || rawOverallStatus.includes('SIAP'));
 
-  // Status Univ
+  // Status Univ & Status Fak
   const rawUnivStatus = (matchedOrder?.statusUniv || '').trim().toUpperCase();
-  const isUnivTaken = isOverallTaken || isStatusTaken(rawUnivStatus) || Boolean(localClaims.univ) || Boolean(localClaims.all);
-  const isUnivExplicitNotReady = rawUnivStatus.length > 0 && !rawUnivStatus.includes('SIAP') && !isUnivTaken;
-  const isUnivReady = !isUnivTaken && (rawUnivStatus.includes('SIAP') || (isOverallReady && !isUnivExplicitNotReady));
-
-  // Status Fak
   const rawFakStatus = (matchedOrder?.statusFak || '').trim().toUpperCase();
+  const hasSubStatuses = Boolean(matchedOrder?.statusUniv || matchedOrder?.statusFak);
+
+  const isUnivTaken = isOverallTaken || isStatusTaken(rawUnivStatus) || Boolean(localClaims.univ) || Boolean(localClaims.all);
   const isFakTaken = isOverallTaken || isStatusTaken(rawFakStatus) || Boolean(localClaims.fak) || Boolean(localClaims.all);
-  const isFakExplicitNotReady = rawFakStatus.length > 0 && !rawFakStatus.includes('SIAP') && !isFakTaken;
-  const isFakReady = !isFakTaken && (rawFakStatus.includes('SIAP') || (isOverallReady && !isFakExplicitNotReady));
+
+  // Status Univ / Fak ready check
+  const isUnivReady = !isUnivTaken && (
+    rawUnivStatus.includes('SIAP') || (!hasSubStatuses && rawOverallStatus.includes('SIAP'))
+  );
+
+  const isFakReady = !isFakTaken && (
+    rawFakStatus.includes('SIAP') || (!hasSubStatuses && rawOverallStatus.includes('SIAP'))
+  );
+
+  // Valid if either Univ or Fak is ready for pickup
+  const isAnyReady = isUnivReady || isFakReady;
 
   // Format order specification split by '|'
   const specLines = (matchedOrder?.orderData || '')
@@ -471,20 +493,37 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
               </button>
             </div>
 
-            {/* Status Validation Warning if NOT 'SIAP DIAMBIL' */}
-            {(!isOverallReady && !isUnivReady && !isFakReady) ? (
+            {/* Status Validation Warning if neither Univ nor Fak is 'SIAP DIAMBIL' */}
+            {!isAnyReady ? (
               <div className="bg-rose-50 border border-rose-200/90 rounded-2xl p-4 text-center space-y-2.5">
                 <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wide">Pesanan Ditolak / Belum Siap</h4>
-                  <p className="text-xs text-rose-600 mt-1 font-semibold">
-                    Status Pesanan Saat Ini: <span className="bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-md font-mono text-[11px]">{matchedOrder?.status || 'TIDAK DIKETAHUI'}</span>
-                  </p>
+                  <div className="text-xs text-rose-600 mt-1 font-semibold flex flex-col gap-1 items-center">
+                    <span>Status Saat Ini:</span>
+                    <div className="flex flex-wrap gap-1.5 justify-center font-mono text-[11px]">
+                      {matchedOrder?.statusUniv && (
+                        <span className="bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-md">
+                          UNIV: {matchedOrder.statusUniv}
+                        </span>
+                      )}
+                      {matchedOrder?.statusFak && (
+                        <span className="bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-md">
+                          FAK: {matchedOrder.statusFak}
+                        </span>
+                      )}
+                      {!matchedOrder?.statusUniv && !matchedOrder?.statusFak && (
+                        <span className="bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-md">
+                          {matchedOrder?.status || 'TIDAK DIKETAHUI'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed bg-white/80 p-2.5 rounded-xl border border-rose-100">
-                  Serah terima hanya dapat dilakukan jika status pesanan di sistem adalah <strong className="text-emerald-700">SIAP DIAMBIL</strong>.
+                  Serah terima hanya dapat dilakukan jika status ID Card Universitas atau Fakultas di sistem berstatus <strong className="text-emerald-700">SIAP DIAMBIL</strong>.
                 </p>
               </div>
             ) : (
@@ -600,15 +639,15 @@ export default function ScannerAdmin({ orders, onBack, onShowToast }: ScannerAdm
                     /* Single item -> 1 button */
                     <button
                       onClick={() => setPendingClaimType('all')}
-                      disabled={loading || !isOverallReady}
+                      disabled={loading || !isAnyReady}
                       className={`w-full py-3 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
-                        !isOverallReady
+                        !isAnyReady
                           ? 'bg-slate-100 text-slate-400 border border-slate-200'
                           : 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white'
                       }`}
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>{!isOverallReady ? 'Pesanan Belum Siap' : 'Konfirmasi Serah Terima Pesanan'}</span>
+                      <span>{!isAnyReady ? 'Pesanan Belum Siap' : 'Konfirmasi Serah Terima Pesanan'}</span>
                     </button>
                   )}
                 </div>

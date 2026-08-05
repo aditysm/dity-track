@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   ArrowLeft, Calendar, CreditCard, School, Copy, Check, User, Hash, 
-  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users, Clock, MapPin
+  MessageCircle, ExternalLink, ShieldAlert, CheckCircle2, Circle, AlertTriangle, Instagram, BookOpen, GraduationCap, X, Loader2, Contact, IdCard, RotateCcw, Undo2, QrCode, Users, Clock, MapPin, Star
 } from 'lucide-react';
 import { Order } from '../types';
-import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername, formatPickupDate } from '../utils';
+import { formatCurrency, formatDateTime, getEmailDisplayName, cleanIgUsername, formatPickupDate, isPickupDatePassed } from '../utils';
 
 interface OrderDetailProps {
   order: Order;
@@ -385,14 +386,16 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
   // Status per ID Card (Univ / Fak) mempengaruhi Sticky Bottom Bar & Pratinjau Desain & Spesifikasi
   const isUnivReady = showUnivCard && (univParsed?.type === 'SIAP_DIAMBIL');
   const isFakReady = showFakCard && (fakParsed?.type === 'SIAP_DIAMBIL');
-  const isLegacyReady = (!showUnivCard && !showFakCard) && (
-    (order.statusUniv && order.statusUniv.toUpperCase().includes('SIAP DIAMBIL')) ||
-    (order.statusFak && order.statusFak.toUpperCase().includes('SIAP DIAMBIL'))
-  );
+  const isLegacyReady = (!showUnivCard && !showFakCard) && (legacyParsed?.type === 'SIAP_DIAMBIL');
 
   const isAnyCardReadyForPickup = isUnivReady || isFakReady || isLegacyReady;
   const isAllCardsReadyForPickup = isAnyCardReadyForPickup;
   const showStickyBottom = !isCancelled;
+
+  const isDatePassed = isPickupDatePassed(order.tanggalPengambilan);
+
+  const clientFullName = order.clientName || getEmailDisplayName(order.clientId) || '';
+  const surveyUrl = `https://docs.google.com/forms/d/e/1FAIpQLSepQJcIuCNbAy0JfBQjC8OKZ7lGflPnIO9Zj6wrBeofjBx8ww/viewform?usp=pp_url&entry.1085399697=${encodeURIComponent(order.id)}&entry.1554158534=${encodeURIComponent(clientFullName)}`;
 
   const hasGroup = !!(savedGroup && savedGroup.trim() !== '');
 
@@ -720,16 +723,18 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                           <ExternalLink className="w-3 h-3 text-emerald-500 shrink-0" />
                         </a>
 
-                        <button
-                          type="button"
-                          onClick={handleOpenPickupModal}
-                          title="Konfirmasi atau Ubah Jam Pengambilan"
-                          className="px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs cursor-pointer"
-                          id="btn-spec-set-pickup-time"
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>{savedPickupTime ? 'Konfirmasi / Ubah Jam' : 'Atur Jam'}</span>
-                        </button>
+                        {!isDatePassed && (
+                          <button
+                            type="button"
+                            onClick={handleOpenPickupModal}
+                            title="Konfirmasi atau Ubah Jam Pengambilan"
+                            className="px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs cursor-pointer"
+                            id="btn-spec-set-pickup-time"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{savedPickupTime ? 'Konfirmasi / Ubah Jam' : 'Atur Jam'}</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -780,16 +785,35 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                             <QrCode className="w-3.5 h-3.5" />
                             <span>Lihat QR Pengambilan</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={handleOpenPickupModal}
-                            title="Konfirmasi Jam Pengambilan"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
-                            id="btn-univ-confirm-time"
+                          {!isDatePassed && (
+                            <button
+                              type="button"
+                              onClick={handleOpenPickupModal}
+                              title="Konfirmasi Jam Pengambilan"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
+                              id="btn-univ-confirm-time"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Konfirmasi Jam ke Admin</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tombol Beri Rating & Survey jika status UNIV SUDAH DIAMBIL */}
+                      {univParsed?.type === 'SUDAH_DIAMBIL' && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
+                          <a
+                            href={surveyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-univ-rating-survey"
                           >
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Jam ke Admin</span>
-                          </button>
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span>Beri Rating & Survey</span>
+                            <ExternalLink className="w-3 h-3 text-amber-100" />
+                          </a>
                         </div>
                       )}
                     </div>
@@ -876,16 +900,35 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                             <QrCode className="w-3.5 h-3.5" />
                             <span>Lihat QR Pengambilan</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={handleOpenPickupModal}
-                            title="Konfirmasi Jam Pengambilan"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
-                            id="btn-fak-confirm-time"
+                          {!isDatePassed && (
+                            <button
+                              type="button"
+                              onClick={handleOpenPickupModal}
+                              title="Konfirmasi Jam Pengambilan"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
+                              id="btn-fak-confirm-time"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Konfirmasi Jam ke Admin</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tombol Beri Rating & Survey jika status FAK SUDAH DIAMBIL */}
+                      {fakParsed?.type === 'SUDAH_DIAMBIL' && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
+                          <a
+                            href={surveyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-fak-rating-survey"
                           >
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Jam ke Admin</span>
-                          </button>
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span>Beri Rating & Survey</span>
+                            <ExternalLink className="w-3 h-3 text-amber-100" />
+                          </a>
                         </div>
                       )}
                     </div>
@@ -931,16 +974,35 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                             <QrCode className="w-3.5 h-3.5" />
                             <span>Lihat QR Pengambilan</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={handleOpenPickupModal}
-                            title="Konfirmasi Jam Pengambilan"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
-                            id="btn-legacy-confirm-time"
+                          {!isDatePassed && (
+                            <button
+                              type="button"
+                              onClick={handleOpenPickupModal}
+                              title="Konfirmasi Jam Pengambilan"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xs"
+                              id="btn-legacy-confirm-time"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Konfirmasi Jam ke Admin</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tombol Beri Rating & Survey jika status legacy SUDAH DIAMBIL */}
+                      {legacyParsed?.type === 'SUDAH_DIAMBIL' && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-200/50">
+                          <a
+                            href={surveyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[11px] shadow-xs transition-all cursor-pointer"
+                            id="btn-legacy-rating-survey"
                           >
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Jam ke Admin</span>
-                          </button>
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span>Beri Rating & Survey</span>
+                            <ExternalLink className="w-3 h-3 text-amber-100" />
+                          </a>
                         </div>
                       )}
                     </div>
@@ -1139,15 +1201,17 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
                   <span>Lihat QR Pengambilan</span>
                 </button>
 
-                <button
-                  onClick={handleOpenPickupModal}
-                  title="Konfirmasi Jam Pengambilan ke Admin WhatsApp"
-                  className="w-52 justify-center px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs shadow-emerald-600/15 cursor-pointer active:scale-95 transition-all flex items-center gap-2"
-                  id="btn-sticky-confirm-time"
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>Konfirmasi Jam ke Admin</span>
-                </button>
+                {!isDatePassed && (
+                  <button
+                    onClick={handleOpenPickupModal}
+                    title="Konfirmasi Jam Pengambilan ke Admin WhatsApp"
+                    className="w-52 justify-center px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs shadow-emerald-600/15 cursor-pointer active:scale-95 transition-all flex items-center gap-2"
+                    id="btn-sticky-confirm-time"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Konfirmasi Jam ke Admin</span>
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -1520,19 +1584,13 @@ export default function OrderDetail({ order, onBack, onConfirm, onShowToast }: O
 
             {/* QR Code Container */}
             <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 shadow-inner">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs relative w-48 h-48 flex items-center justify-center">
-                {isQrLoading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white rounded-xl z-10 space-y-2">
-                    <Loader2 className="w-7 h-7 text-blue-600 animate-spin" />
-                    <span className="text-[11px] font-medium text-slate-400">Memuat QR Code...</span>
-                  </div>
-                )}
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(order.id)}`} 
-                  alt={`QR Pengambilan ${order.id}`}
-                  onLoad={() => setIsQrLoading(false)}
-                  onError={() => setIsQrLoading(false)}
-                  className={`w-48 h-48 object-contain rounded-md transition-opacity duration-300 ${isQrLoading ? 'opacity-0' : 'opacity-100'}`}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
+                <QRCodeSVG 
+                  value={order.id} 
+                  size={192} 
+                  level="H" 
+                  marginSize={1}
+                  className="w-48 h-48 rounded-md"
                 />
               </div>
 

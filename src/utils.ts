@@ -250,6 +250,59 @@ export function formatPickupDate(dateStr?: string, includeDayName = false): stri
 }
 
 /**
+ * Checks if the pickup date has passed (i.e. is before today).
+ */
+export function isPickupDatePassed(dateStr?: string): boolean {
+  if (!dateStr || String(dateStr).trim() === '' || String(dateStr).trim() === '-') {
+    return false;
+  }
+
+  const cleanStr = String(dateStr).trim();
+  let year = 2026;
+  let monthIdx = 7;
+  let day = 4;
+  let parsedSuccess = false;
+
+  const gvizMatch = cleanStr.match(/Date\s*\(\s*(\d{4})\s*,\s*(\d{1,2})\s*,\s*(\d{1,2})\s*\)/i);
+  if (gvizMatch) {
+    year = parseInt(gvizMatch[1], 10);
+    monthIdx = parseInt(gvizMatch[2], 10);
+    day = parseInt(gvizMatch[3], 10);
+    parsedSuccess = true;
+  } else {
+    const isoMatch = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+      year = parseInt(isoMatch[1], 10);
+      monthIdx = parseInt(isoMatch[2], 10) - 1;
+      day = parseInt(isoMatch[3], 10);
+      parsedSuccess = true;
+    } else {
+      const ddmmyyyyMatch = cleanStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (ddmmyyyyMatch) {
+        day = parseInt(ddmmyyyyMatch[1], 10);
+        monthIdx = parseInt(ddmmyyyyMatch[2], 10) - 1;
+        year = parseInt(ddmmyyyyMatch[3], 10);
+        parsedSuccess = true;
+      } else {
+        const d = new Date(cleanStr);
+        if (!isNaN(d.getTime())) {
+          year = d.getFullYear();
+          monthIdx = d.getMonth();
+          day = d.getDate();
+          parsedSuccess = true;
+        }
+      }
+    }
+  }
+
+  if (!parsedSuccess) return false;
+
+  const pickupDayEnd = new Date(year, monthIdx, day, 23, 59, 59, 999);
+  const now = new Date();
+  return now.getTime() > pickupDayEnd.getTime();
+}
+
+/**
  * Flexible matching for order invoice IDs.
  * Allows searching by full ID ("INV-20260720-01"), without "INV" prefix ("20260720-01"),
  * or by suffix digits ("01", "0720-01", "2026072001").
